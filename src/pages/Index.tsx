@@ -4,6 +4,7 @@ import { useTickets } from '@/hooks/use-tickets';
 import AddTab from '@/components/lotto/AddTab';
 import TicketsTab from '@/components/lotto/TicketsTab';
 import ProbTab from '@/components/lotto/ProbTab';
+import AdBanner from '@/components/AdBanner';
 
 type Tab = 'add' | 'tickets' | 'prob';
 
