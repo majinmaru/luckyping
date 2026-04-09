@@ -1,1 +1,4 @@
 project_id = "wtpplbyvhhmuqklyynce"
+
+[functions.lotto-fetch]
+verify_jwt = false
