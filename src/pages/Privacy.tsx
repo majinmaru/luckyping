@@ -68,7 +68,7 @@ export default function Privacy() {
           <section>
             <h2 className="text-base font-semibold text-primary mb-2">8. 개인정보 보호책임자</h2>
             <p>개인정보 처리에 관한 문의는 아래 연락처로 문의해주세요:</p>
-            <p className="mt-2">이메일: support@luckyping.lovable.app</p>
+            <p className="mt-2">이메일: gotch0411@gmail.com</p>
           </section>
 
           <p className="text-muted-foreground text-xs mt-8">시행일: 2026년 4월 9일</p>
