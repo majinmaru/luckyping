@@ -17,6 +17,7 @@ export default function Index() {
 
   const tabs: { id: Tab; icon: string; label: string }[] = [
     { id: 'add', icon: '✍️', label: '번호입력' },
+    { id: 'game', icon: '🎰', label: '공뽑기' },
     { id: 'tickets', icon: '🎫', label: '내 티켓' },
     { id: 'prob', icon: '📊', label: '확률분석' },
   ];
