@@ -37,7 +37,7 @@ export default function ProbTab({ tickets }: ProbTabProps) {
   const loadData = async (force: boolean) => {
     setLoading(true);
     setStatusState('loading');
-    setStatusText('데이터 확인 중...');
+    setStatusText(force ? '최신 데이터 업데이트 중...' : '데이터 로드 중...');
     try {
       const { stats: newStats, draws } = await fetchLottoData(force);
       setStats(newStats);
@@ -46,11 +46,18 @@ export default function ProbTab({ tickets }: ProbTabProps) {
       saveHistoryCache(draws);
       setStatusState('ok');
       setStatusText(getUpdateStatusText(newStats.latestDrwNo));
-      toast(force ? '✅ 데이터 업데이트 완료' : '✅ 데이터 로드 완료');
+      if (force) {
+        const expected = getExpectedLatestDrawKST();
+        if (newStats.latestDrwNo >= expected) {
+          toast('✅ 최신 데이터로 업데이트 완료');
+        } else {
+          toast('⚠️ 일부 업데이트 완료 (최신 회차 데이터가 아직 제공되지 않을 수 있어요)');
+        }
+      }
     } catch (err: any) {
       if (stats.freq && stats.totalDraws > 0) {
         setStatusState('warn');
-        setStatusText(`로드 실패 · 로컬 캐시 사용 중`);
+        setStatusText(`업데이트 실패 · 기존 데이터 사용 중 (${stats.latestDrwNo}회차)`);
       } else {
         setStatusState('err');
         setStatusText(`로드 실패: ${err.message}`);
