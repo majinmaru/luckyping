@@ -1,96 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 240 20% 4%;
+    --foreground: 240 10% 92%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 240 15% 8%;
+    --card-foreground: 240 10% 92%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 240 15% 8%;
+    --popover-foreground: 240 10% 92%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 44 90% 60%;
+    --primary-foreground: 40 80% 8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 12% 12%;
+    --secondary-foreground: 240 10% 92%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 240 12% 14%;
+    --muted-foreground: 240 10% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 240 12% 14%;
+    --accent-foreground: 44 90% 60%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 145 60% 50%;
+    --success-foreground: 145 60% 10%;
 
-    --radius: 0.5rem;
+    --border: 240 12% 22%;
+    --input: 240 12% 22%;
+    --ring: 44 90% 60%;
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 1rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-background: 240 15% 5%;
+    --sidebar-foreground: 240 10% 80%;
+    --sidebar-primary: 44 90% 60%;
+    --sidebar-primary-foreground: 40 80% 8%;
+    --sidebar-accent: 240 12% 14%;
+    --sidebar-accent-foreground: 240 10% 80%;
+    --sidebar-border: 240 12% 22%;
+    --sidebar-ring: 44 90% 60%;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --gold: 44 90% 60%;
+    --gold-glow: 40 85% 50%;
+    --surface: 240 15% 8%;
+    --surface2: 240 14% 11%;
   }
 }
 
@@ -101,5 +62,32 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Noto Sans KR', sans-serif;
   }
+}
+
+/* Ball colors */
+.ball-color-1 { background: #fbc400; border-color: #e8a800; color: #1a1000; }
+.ball-color-2 { background: #69c8f2; border-color: #4ab0e0; color: #0a1a2a; }
+.ball-color-3 { background: #ff7272; border-color: #e05555; color: #1a0000; }
+.ball-color-4 { background: #aaaaaa; border-color: #888; color: #1a1a1a; }
+.ball-color-5 { background: #b0d840; border-color: #8cba20; color: #1a2800; }
+
+/* Gold glow animation */
+@keyframes gold-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(245, 200, 66, 0.5); }
+  50% { box-shadow: 0 0 24px rgba(245, 200, 66, 0.8); }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out;
 }
