@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { BallGrid, SelectedRow, MiniBall } from './BallGrid';
+import BallGame from './BallGame';
 import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
 import DatePickerField from './DatePickerField';
+
+type Mode = 'manual' | 'game';
 
 interface AddTabProps {
   tickets: Ticket[];
@@ -10,6 +13,7 @@ interface AddTabProps {
 }
 
 export default function AddTab({ tickets, addTicket }: AddTabProps) {
+  const [mode, setMode] = useState<Mode>('manual');
   const [selectedNums, setSelectedNums] = useState<number[]>([]);
   const [showSave, setShowSave] = useState(false);
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
@@ -46,44 +50,74 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="bg-card border border-border rounded-lg p-5 mb-4 shadow-lg">
-        <h3 className="font-display text-base text-primary mb-4 tracking-wide">🔢 번호 선택 (6개)</h3>
-        <BallGrid selectedNums={selectedNums} onSelect={setSelectedNums} />
-        <SelectedRow nums={selectedNums} />
-        <div className="flex gap-2.5 flex-wrap">
-          <button onClick={randomPick} className="px-5 py-3 rounded-lg border border-border bg-transparent text-muted-foreground text-sm hover:border-primary hover:text-primary transition">
-            🎲 랜덤 추천
-          </button>
-          <button onClick={() => setSelectedNums([])} className="px-5 py-3 rounded-lg border border-border bg-transparent text-muted-foreground text-sm hover:border-primary hover:text-primary transition">
-            ↺ 초기화
-          </button>
-          <button onClick={openSave} className="ml-auto px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-gold-glow transition">
-            저장하기
-          </button>
-        </div>
+      {/* Mode toggle */}
+      <div className="flex gap-1 p-1 bg-surface2 rounded-lg mb-4 border border-border">
+        <button
+          onClick={() => setMode('manual')}
+          className={`flex-1 py-2.5 rounded-md text-sm font-medium transition ${
+            mode === 'manual'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          ✍️ 번호 선택
+        </button>
+        <button
+          onClick={() => setMode('game')}
+          className={`flex-1 py-2.5 rounded-md text-sm font-medium transition ${
+            mode === 'game'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          🎰 공 뽑기
+        </button>
       </div>
 
-      {showSave && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5" onClick={() => setShowSave(false)}>
-          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <h3 className="font-display text-lg text-primary mb-5">✅ 티켓 저장</h3>
-            <div className="flex gap-1.5 flex-wrap mb-5">
-              {[...selectedNums].sort((a, b) => a - b).map(n => <MiniBall key={n} n={n} size={34} />)}
-            </div>
-             <DatePickerField label="구매 일자" value={saveDate} onChange={setSaveDate} />
-            <div className="mb-4">
-              <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
-                <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
-                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
-            </div>
-            <div className="flex gap-2.5">
-              <button onClick={() => setShowSave(false)} className="px-5 py-3 rounded-lg border border-border text-muted-foreground text-sm hover:border-primary hover:text-primary transition">취소</button>
-              <button onClick={doSave} disabled={saving} className="ml-auto px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-gold-glow transition disabled:opacity-50">
-                {saving ? '저장 중...' : '저장'}
+      {mode === 'manual' ? (
+        <>
+          <div className="bg-card border border-border rounded-lg p-5 mb-4 shadow-lg">
+            <h3 className="font-display text-base text-primary mb-4 tracking-wide">🔢 번호 선택 (6개)</h3>
+            <BallGrid selectedNums={selectedNums} onSelect={setSelectedNums} />
+            <SelectedRow nums={selectedNums} />
+            <div className="flex gap-2.5 flex-wrap">
+              <button onClick={randomPick} className="px-5 py-3 rounded-lg border border-border bg-transparent text-muted-foreground text-sm hover:border-primary hover:text-primary transition">
+                🎲 랜덤 추천
+              </button>
+              <button onClick={() => setSelectedNums([])} className="px-5 py-3 rounded-lg border border-border bg-transparent text-muted-foreground text-sm hover:border-primary hover:text-primary transition">
+                ↺ 초기화
+              </button>
+              <button onClick={openSave} className="ml-auto px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-gold-glow transition">
+                저장하기
               </button>
             </div>
           </div>
-        </div>
+
+          {showSave && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5" onClick={() => setShowSave(false)}>
+              <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <h3 className="font-display text-lg text-primary mb-5">✅ 티켓 저장</h3>
+                <div className="flex gap-1.5 flex-wrap mb-5">
+                  {[...selectedNums].sort((a, b) => a - b).map(n => <MiniBall key={n} n={n} size={34} />)}
+                </div>
+                <DatePickerField label="구매 일자" value={saveDate} onChange={setSaveDate} />
+                <div className="mb-4">
+                  <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
+                  <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
+                    className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
+                </div>
+                <div className="flex gap-2.5">
+                  <button onClick={() => setShowSave(false)} className="px-5 py-3 rounded-lg border border-border text-muted-foreground text-sm hover:border-primary hover:text-primary transition">취소</button>
+                  <button onClick={doSave} disabled={saving} className="ml-auto px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-gold-glow transition disabled:opacity-50">
+                    {saving ? '저장 중...' : '저장'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <BallGame onComplete={() => {}} addTicket={addTicket} />
       )}
     </div>
   );

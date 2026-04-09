@@ -3,12 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTickets } from '@/hooks/use-tickets';
 import AddTab from '@/components/lotto/AddTab';
-import BallGame from '@/components/lotto/BallGame';
 import TicketsTab from '@/components/lotto/TicketsTab';
 import ProbTab from '@/components/lotto/ProbTab';
 import AdBanner from '@/components/AdBanner';
 
-type Tab = 'add' | 'game' | 'tickets' | 'prob';
+type Tab = 'add' | 'tickets' | 'prob';
 
 export default function Index() {
   const { user, signOut } = useAuth();
@@ -17,7 +16,6 @@ export default function Index() {
 
   const tabs: { id: Tab; icon: string; label: string }[] = [
     { id: 'add', icon: '✍️', label: '번호입력' },
-    { id: 'game', icon: '🎰', label: '공뽑기' },
     { id: 'tickets', icon: '🎫', label: '내 티켓' },
     { id: 'prob', icon: '📊', label: '확률분석' },
   ];
@@ -61,7 +59,6 @@ export default function Index() {
       {/* Content */}
       <div className="max-w-[600px] mx-auto p-5">
         {tab === 'add' && <AddTab tickets={tickets} addTicket={addTicket} />}
-        {tab === 'game' && <BallGame onComplete={() => {}} addTicket={addTicket} />}
         {tab === 'tickets' && <TicketsTab tickets={tickets} updateTicket={updateTicket} deleteTicket={deleteTicket} deleteAllTickets={deleteAllTickets} />}
         {tab === 'prob' && <ProbTab tickets={tickets} />}
       </div>
