@@ -9,7 +9,6 @@ export function colorClass(n: number): string {
   return 'ball-color-5';
 }
 
-// Ticket type
 export interface Ticket {
   id: string;
   nums: number[];
@@ -19,7 +18,6 @@ export interface Ticket {
   updatedAt: number;
 }
 
-// Stats cache type
 export interface StatsCache {
   freq: Record<string, number> | null;
   totalDraws: number;
@@ -34,7 +32,7 @@ export interface DrawData {
   bonusNo: number;
 }
 
-// Load/save from localStorage (cache only)
+// localStorage helpers (cache layer)
 export function loadStatsCache(): StatsCache {
   try {
     const s = localStorage.getItem('lotto_stats');
@@ -64,46 +62,89 @@ function buildStats(draws: DrawData[]): StatsCache {
   for (let i = 1; i <= 45; i++) freq[i] = 0;
   draws.forEach(d => d.nums.forEach(n => { freq[n] = (freq[n] || 0) + 1; }));
   const latest = draws.length > 0 ? Math.max(...draws.map(d => d.drwNo)) : 0;
-  return {
-    freq,
-    totalDraws: draws.length,
-    latestDrwNo: latest,
-    updatedAt: new Date().toISOString(),
-  };
+  return { freq, totalDraws: draws.length, latestDrwNo: latest, updatedAt: new Date().toISOString() };
 }
 
-/** Fetch all draws from DB */
-async function fetchDrawsFromDB(): Promise<DrawData[]> {
-  const allDraws: DrawData[] = [];
-  let from = 0;
-  const pageSize = 1000;
+// ─── Static JSON loaders (bundled with app, like GitHub Pages) ───
 
-  while (true) {
-    const { data, error } = await supabase
+async function loadStaticStats(): Promise<StatsCache | null> {
+  try {
+    const res = await fetch('/data/stats.json');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      freq: data.freq || null,
+      totalDraws: data.totalDraws || 0,
+      latestDrwNo: data.latestDrwNo || 0,
+      updatedAt: data.updatedAt || null,
+    };
+  } catch { return null; }
+}
+
+async function loadStaticHistory(): Promise<DrawData[]> {
+  try {
+    const res = await fetch('/data/history.json');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.draws || []).map((d: any) => ({
+      drwNo: Number(d.drwNo),
+      drwNoDate: d.drwNoDate,
+      nums: (d.nums || []).map(Number).sort((a: number, b: number) => a - b),
+      bonusNo: Number(d.bonusNo || 0),
+    })).filter((d: DrawData) => d.drwNo && d.nums.length === 6);
+  } catch { return []; }
+}
+
+// ─── DB loaders (delta updates) ───
+
+async function fetchDrawsFromDB(fromDrwNo?: number): Promise<DrawData[]> {
+  try {
+    let query = supabase
       .from('lotto_draws')
       .select('drw_no, drw_no_date, nums, bonus_no')
-      .order('drw_no', { ascending: true })
-      .range(from, from + pageSize - 1);
+      .order('drw_no', { ascending: true });
 
-    if (error || !data || data.length === 0) break;
-
-    for (const row of data) {
-      allDraws.push({
-        drwNo: row.drw_no,
-        drwNoDate: row.drw_no_date,
-        nums: (row.nums as number[]).sort((a, b) => a - b),
-        bonusNo: row.bonus_no,
-      });
+    if (fromDrwNo) {
+      query = query.gt('drw_no', fromDrwNo);
     }
 
-    if (data.length < pageSize) break;
-    from += pageSize;
-  }
+    const allDraws: DrawData[] = [];
+    let from = 0;
+    const pageSize = 1000;
 
-  return allDraws;
+    while (true) {
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error || !data || data.length === 0) break;
+      for (const row of data) {
+        allDraws.push({
+          drwNo: row.drw_no,
+          drwNoDate: row.drw_no_date,
+          nums: (row.nums as number[]).sort((a, b) => a - b),
+          bonusNo: row.bonus_no,
+        });
+      }
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    return allDraws;
+  } catch { return []; }
 }
 
-/** Try fetching a single draw from the official API (works for Korean users only) */
+/** Save new draws to DB so other users benefit (Korean users only) */
+async function saveDrawsToDB(draws: DrawData[]) {
+  if (draws.length === 0) return;
+  const rows = draws.map(d => ({
+    drw_no: d.drwNo,
+    drw_no_date: d.drwNoDate,
+    nums: d.nums,
+    bonus_no: d.bonusNo,
+  }));
+  for (let i = 0; i < rows.length; i += 50) {
+    await supabase.from('lotto_draws').upsert(rows.slice(i, i + 50), { onConflict: 'drw_no' });
+  }
+}
+
+/** Try fetching a single draw from official API (works for Korean users only) */
 async function fetchDrawDirect(drwNo: number): Promise<DrawData | null> {
   try {
     const controller = new AbortController();
@@ -126,92 +167,93 @@ async function fetchDrawDirect(drwNo: number): Promise<DrawData | null> {
       ].sort((a: number, b: number) => a - b),
       bonusNo: data.bnusNo,
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-/** Save new draws to DB so other users benefit */
-async function saveDrawsToDB(draws: DrawData[]) {
-  if (draws.length === 0) return;
-  const rows = draws.map(d => ({
-    drw_no: d.drwNo,
-    drw_no_date: d.drwNoDate,
-    nums: d.nums,
-    bonus_no: d.bonusNo,
-  }));
-  // upsert in batches of 50
-  for (let i = 0; i < rows.length; i += 50) {
-    await supabase.from('lotto_draws').upsert(rows.slice(i, i + 50), { onConflict: 'drw_no' });
-  }
+function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
+  const map = new Map(existing.map(d => [d.drwNo, d]));
+  newDraws.forEach(d => map.set(d.drwNo, d));
+  return Array.from(map.values()).sort((a, b) => a.drwNo - b.drwNo);
 }
 
 /**
- * Main data loading function.
- * 1. Load from localStorage cache (instant)
- * 2. Load from DB (fast, always up-to-date if any Korean user has synced)
- * 3. If still missing draws, try client-side fetch (Korean users only)
- * 4. Save new draws to DB for all users
+ * Main data loading flow (same as GitHub Pages version):
+ * 
+ * 1. localStorage cache → instant display
+ * 2. Static JSON files (stats.json, history.json) → always fresh on deploy
+ * 3. DB delta → picks up any draws added since last deploy
+ * 4. Client-side direct fetch → Korean users can fetch missing draws & save to DB
  */
 export async function fetchLottoData(forceUpdate = false) {
-  // Step 1: Use cache for instant display
-  let cached = loadHistoryCache();
-  let cachedStats = loadStatsCache();
-  const latestCached = cachedStats.latestDrwNo || 0;
+  // Step 1: localStorage cache (instant)
+  let draws = loadHistoryCache();
+  let stats = loadStatsCache();
   const expected = getExpectedLatestDrawKST();
 
-  // If cache is fresh and not forcing, return immediately
-  if (!forceUpdate && latestCached >= expected && cached.length > 0) {
-    return { stats: cachedStats, draws: cached };
+  if (!forceUpdate && stats.latestDrwNo >= expected && draws.length > 0) {
+    return { stats, draws };
   }
 
-  // Step 2: Fetch from DB
-  try {
-    const dbDraws = await fetchDrawsFromDB();
-    if (dbDraws.length > 0) {
-      cached = dbDraws;
-      cachedStats = buildStats(dbDraws);
-      saveHistoryCache(cached);
-      saveStatsCache(cachedStats);
+  // Step 2: Load static JSON (bundled with app)
+  if (draws.length === 0 || stats.latestDrwNo === 0) {
+    const [staticStats, staticHistory] = await Promise.all([
+      loadStaticStats(),
+      loadStaticHistory(),
+    ]);
+    if (staticHistory.length > 0) {
+      draws = staticHistory;
+      stats = staticStats || buildStats(draws);
+      saveHistoryCache(draws);
+      saveStatsCache(stats);
 
-      if (cachedStats.latestDrwNo >= expected) {
-        return { stats: cachedStats, draws: cached };
+      if (!forceUpdate && stats.latestDrwNo >= expected) {
+        return { stats, draws };
       }
-    }
-  } catch {
-    // DB fetch failed, continue with cache
-  }
-
-  // Step 3: Try client-side direct fetch for missing draws (Korean users)
-  const from = cachedStats.latestDrwNo + 1;
-  if (from <= expected) {
-    const newDraws: DrawData[] = [];
-    for (let i = from; i <= expected; i += 5) {
-      const batch: Promise<DrawData | null>[] = [];
-      for (let j = i; j < Math.min(i + 5, expected + 1); j++) {
-        batch.push(fetchDrawDirect(j));
-      }
-      const results = await Promise.all(batch);
-      for (const r of results) {
-        if (r) newDraws.push(r);
-      }
-    }
-
-    if (newDraws.length > 0) {
-      // Merge
-      const map = new Map(cached.map(d => [d.drwNo, d]));
-      newDraws.forEach(d => map.set(d.drwNo, d));
-      cached = Array.from(map.values()).sort((a, b) => a.drwNo - b.drwNo);
-      cachedStats = buildStats(cached);
-      saveHistoryCache(cached);
-      saveStatsCache(cachedStats);
-
-      // Save to DB for other users
-      saveDrawsToDB(newDraws).catch(() => {});
     }
   }
 
-  return { stats: cachedStats, draws: cached };
+  // Step 3: Check DB for newer draws
+  const latestLocal = stats.latestDrwNo || 0;
+  const dbDraws = await fetchDrawsFromDB(latestLocal);
+  if (dbDraws.length > 0) {
+    draws = mergeDraws(draws, dbDraws);
+    stats = buildStats(draws);
+    saveHistoryCache(draws);
+    saveStatsCache(stats);
+
+    if (!forceUpdate && stats.latestDrwNo >= expected) {
+      return { stats, draws };
+    }
+  }
+
+  // Step 4: Client-side direct fetch for truly missing draws (Korean users)
+  if (forceUpdate || stats.latestDrwNo < expected) {
+    const from = stats.latestDrwNo + 1;
+    if (from <= expected) {
+      const newDraws: DrawData[] = [];
+      for (let i = from; i <= expected; i += 5) {
+        const batch: Promise<DrawData | null>[] = [];
+        for (let j = i; j < Math.min(i + 5, expected + 1); j++) {
+          batch.push(fetchDrawDirect(j));
+        }
+        const results = await Promise.all(batch);
+        for (const r of results) {
+          if (r) newDraws.push(r);
+        }
+      }
+
+      if (newDraws.length > 0) {
+        draws = mergeDraws(draws, newDraws);
+        stats = buildStats(draws);
+        saveHistoryCache(draws);
+        saveStatsCache(stats);
+        // Save to DB for other users
+        saveDrawsToDB(newDraws).catch(() => {});
+      }
+    }
+  }
+
+  return { stats, draws };
 }
 
 export function getExpectedLatestDrawKST(): number {
