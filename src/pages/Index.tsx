@@ -61,6 +61,7 @@ export default function Index() {
       {/* Content */}
       <div className="max-w-[600px] mx-auto p-5">
         {tab === 'add' && <AddTab tickets={tickets} addTicket={addTicket} />}
+        {tab === 'game' && <BallGame onComplete={() => {}} addTicket={addTicket} />}
         {tab === 'tickets' && <TicketsTab tickets={tickets} updateTicket={updateTicket} deleteTicket={deleteTicket} deleteAllTickets={deleteAllTickets} />}
         {tab === 'prob' && <ProbTab tickets={tickets} />}
       </div>
