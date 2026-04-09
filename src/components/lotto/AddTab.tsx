@@ -70,11 +70,7 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
             <div className="flex gap-1.5 flex-wrap mb-5">
               {[...selectedNums].sort((a, b) => a - b).map(n => <MiniBall key={n} n={n} size={34} />)}
             </div>
-            <div className="mb-4">
-              <label className="block text-xs text-muted-foreground mb-2 tracking-widest">구매 일자</label>
-              <input type="date" value={saveDate} onChange={e => setSaveDate(e.target.value)}
-                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary" />
-            </div>
+             <DatePickerField label="구매 일자" value={saveDate} onChange={setSaveDate} />
             <div className="mb-4">
               <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
               <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
