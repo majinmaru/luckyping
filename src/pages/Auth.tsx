@@ -106,9 +106,9 @@ export default function Auth() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="숫자, 영문, 특수문자 포함 8자리"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full rounded-lg border border-border bg-surface2 px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                 />
               </div>
