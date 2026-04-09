@@ -4,6 +4,7 @@ import { useTickets } from '@/hooks/use-tickets';
 import AddTab from '@/components/lotto/AddTab';
 import TicketsTab from '@/components/lotto/TicketsTab';
 import ProbTab from '@/components/lotto/ProbTab';
+import AdBanner from '@/components/AdBanner';
 
 type Tab = 'add' | 'tickets' | 'prob';
 
@@ -59,6 +60,11 @@ export default function Index() {
         {tab === 'add' && <AddTab tickets={tickets} addTicket={addTicket} />}
         {tab === 'tickets' && <TicketsTab tickets={tickets} updateTicket={updateTicket} deleteTicket={deleteTicket} deleteAllTickets={deleteAllTickets} />}
         {tab === 'prob' && <ProbTab tickets={tickets} />}
+      </div>
+
+      {/* Ad Banner */}
+      <div className="max-w-[600px] mx-auto px-5 mt-4">
+        <AdBanner adSlot="YOUR_AD_SLOT_ID" format="horizontal" />
       </div>
 
       <footer className="max-w-[600px] mx-auto mt-1.5 px-5 pb-6 text-center">
