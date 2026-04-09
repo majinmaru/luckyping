@@ -124,10 +124,12 @@ export default function Auth() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full rounded-lg border border-border bg-surface2 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  className="w-full rounded-lg border border-border bg-surface2 px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                 />
               </div>
             )}
+
+            {mode === 'signup' && <PasswordChecklist password={password} />}
 
             <button
               type="submit"
