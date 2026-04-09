@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      lotto_draws: {
+        Row: {
+          bonus_no: number
+          created_at: string
+          drw_no: number
+          drw_no_date: string
+          nums: number[]
+        }
+        Insert: {
+          bonus_no?: number
+          created_at?: string
+          drw_no: number
+          drw_no_date: string
+          nums: number[]
+        }
+        Update: {
+          bonus_no?: number
+          created_at?: string
+          drw_no?: number
+          drw_no_date?: string
+          nums?: number[]
+        }
+        Relationships: []
+      }
       tickets: {
         Row: {
           created_at: string

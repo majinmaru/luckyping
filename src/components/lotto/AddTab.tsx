@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BallGrid, SelectedRow, MiniBall } from './BallGrid';
 import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
+import DatePickerField from './DatePickerField';
 
 interface AddTabProps {
   tickets: Ticket[];
@@ -69,15 +70,11 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
             <div className="flex gap-1.5 flex-wrap mb-5">
               {[...selectedNums].sort((a, b) => a - b).map(n => <MiniBall key={n} n={n} size={34} />)}
             </div>
-            <div className="mb-4">
-              <label className="block text-xs text-muted-foreground mb-2 tracking-widest">구매 일자</label>
-              <input type="date" value={saveDate} onChange={e => setSaveDate(e.target.value)}
-                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary" />
-            </div>
+             <DatePickerField label="구매 일자" value={saveDate} onChange={setSaveDate} />
             <div className="mb-4">
               <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
-              <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
-                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
+                <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
+                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
             </div>
             <div className="flex gap-2.5">
               <button onClick={() => setShowSave(false)} className="px-5 py-3 rounded-lg border border-border text-muted-foreground text-sm hover:border-primary hover:text-primary transition">취소</button>
