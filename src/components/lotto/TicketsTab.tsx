@@ -1,24 +1,24 @@
 import { useState } from 'react';
 import { MiniBall } from './BallGrid';
-import type { Ticket } from '@/lib/lotto';
-import { saveTickets } from '@/lib/lotto';
+import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
 
 interface TicketsTabProps {
   tickets: Ticket[];
-  setTickets: (t: Ticket[]) => void;
+  updateTicket: (id: string, updates: Partial<Pick<Ticket, 'purchases' | 'wins'>>) => Promise<void>;
+  deleteTicket: (id: string) => Promise<void>;
+  deleteAllTickets: () => Promise<void>;
 }
 
 const PAGE_SIZE = 10;
 
-export default function TicketsTab({ tickets, setTickets }: TicketsTabProps) {
+export default function TicketsTab({ tickets, updateTicket, deleteTicket, deleteAllTickets }: TicketsTabProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState('recent-update');
   const [confirmMode, setConfirmMode] = useState<'single' | 'all' | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  // Modals
   const [buyModal, setBuyModal] = useState<string | null>(null);
   const [winModal, setWinModal] = useState<string | null>(null);
   const [buyDate, setBuyDate] = useState(new Date().toISOString().split('T')[0]);
@@ -30,7 +30,6 @@ export default function TicketsTab({ tickets, setTickets }: TicketsTabProps) {
     const arr = [...tickets];
     const lp = (t: Ticket) => t.purchases.map(p => p.date).sort().at(-1) || '';
     const lw = (t: Ticket) => t.wins.map(w => w.date).sort().at(-1) || '';
-
     switch (sortMode) {
       case 'recent-update': return arr.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       case 'reg-newest': return arr.sort((a, b) => lp(b).localeCompare(lp(a)));
@@ -56,16 +55,13 @@ export default function TicketsTab({ tickets, setTickets }: TicketsTabProps) {
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const pageItems = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const doDelete = () => {
+  const doDelete = async () => {
     if (confirmMode === 'all') {
-      saveTickets([]);
-      setTickets([]);
+      await deleteAllTickets();
       setCurrentPage(1);
       toast('티켓 전체가 삭제됐어요');
     } else if (pendingDeleteId) {
-      const updated = tickets.filter(t => t.id !== pendingDeleteId);
-      saveTickets(updated);
-      setTickets(updated);
+      await deleteTicket(pendingDeleteId);
       if (expandedId === pendingDeleteId) setExpandedId(null);
       toast('티켓이 삭제됐어요');
     }
@@ -73,29 +69,23 @@ export default function TicketsTab({ tickets, setTickets }: TicketsTabProps) {
     setPendingDeleteId(null);
   };
 
-  const addBuy = () => {
-    if (!buyDate) { toast('날짜를 선택해주세요'); return; }
-    const updated = tickets.map(t => t.id === buyModal ? {
-      ...t,
-      purchases: [...t.purchases, { date: buyDate, memo: buyMemo }].sort((a, b) => b.date.localeCompare(a.date)),
-      updatedAt: Date.now(),
-    } : t);
-    saveTickets(updated);
-    setTickets(updated);
+  const addBuy = async () => {
+    if (!buyDate || !buyModal) { toast('날짜를 선택해주세요'); return; }
+    const t = tickets.find(x => x.id === buyModal);
+    if (!t) return;
+    const newPurchases = [...t.purchases, { date: buyDate, memo: buyMemo }].sort((a, b) => b.date.localeCompare(a.date));
+    await updateTicket(t.id, { purchases: newPurchases });
     setBuyModal(null);
     setBuyMemo('');
     toast('🛒 구매 이력이 추가됐어요');
   };
 
-  const addWin = () => {
-    if (!winDate) { toast('날짜를 선택해주세요'); return; }
-    const updated = tickets.map(t => t.id === winModal ? {
-      ...t,
-      wins: [...t.wins, { date: winDate, rank: winRank }].sort((a, b) => b.date.localeCompare(a.date)),
-      updatedAt: Date.now(),
-    } : t);
-    saveTickets(updated);
-    setTickets(updated);
+  const addWin = async () => {
+    if (!winDate || !winModal) { toast('날짜를 선택해주세요'); return; }
+    const t = tickets.find(x => x.id === winModal);
+    if (!t) return;
+    const newWins = [...t.wins, { date: winDate, rank: winRank }].sort((a, b) => b.date.localeCompare(a.date));
+    await updateTicket(t.id, { wins: newWins });
     setWinModal(null);
     toast(`🏆 ${winRank}등 당첨 기록 완료!`);
   };
@@ -192,7 +182,6 @@ export default function TicketsTab({ tickets, setTickets }: TicketsTabProps) {
             );
           })}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-1.5 mt-4 flex-wrap">
               <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="w-8 h-8 rounded-lg border border-border bg-surface2 text-muted-foreground font-mono text-sm flex items-center justify-center disabled:opacity-30 hover:border-primary hover:text-primary transition">‹</button>

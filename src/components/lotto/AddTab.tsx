@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { BallGrid, SelectedRow, MiniBall } from './BallGrid';
-import type { Ticket } from '@/lib/lotto';
-import { saveTickets } from '@/lib/lotto';
+import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
 
 interface AddTabProps {
   tickets: Ticket[];
-  setTickets: (t: Ticket[]) => void;
+  addTicket: (nums: number[], purchase: { date: string; memo: string }) => Promise<void>;
 }
 
-export default function AddTab({ tickets, setTickets }: AddTabProps) {
+export default function AddTab({ tickets, addTicket }: AddTabProps) {
   const [selectedNums, setSelectedNums] = useState<number[]>([]);
   const [showSave, setShowSave] = useState(false);
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
   const [saveMemo, setSaveMemo] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const randomPick = () => {
     if (selectedNums.length === 0) { toast('번호를 1개 이상 먼저 선택해주세요'); return; }
@@ -33,30 +33,11 @@ export default function AddTab({ tickets, setTickets }: AddTabProps) {
     setShowSave(true);
   };
 
-  const doSave = () => {
-    const sorted = [...selectedNums].sort((a, b) => a - b);
+  const doSave = async () => {
     if (!saveDate) { toast('날짜를 선택해주세요'); return; }
-    const key = sorted.join(',');
-    const now = Date.now();
-    const existing = tickets.find(t => t.nums.join(',') === key);
-    let updated: Ticket[];
-    if (existing) {
-      updated = tickets.map(t => t.id === existing.id ? {
-        ...t,
-        purchases: [...t.purchases, { date: saveDate, memo: saveMemo }].sort((a, b) => b.date.localeCompare(a.date)),
-        updatedAt: now,
-      } : t);
-      toast('✅ 기존 티켓에 구매 이력 추가');
-    } else {
-      updated = [...tickets, {
-        id: String(now), nums: sorted,
-        purchases: [{ date: saveDate, memo: saveMemo }], wins: [],
-        createdAt: now, updatedAt: now,
-      }];
-      toast('🎫 새 티켓 저장 완료!');
-    }
-    saveTickets(updated);
-    setTickets(updated);
+    setSaving(true);
+    await addTicket(selectedNums, { date: saveDate, memo: saveMemo });
+    setSaving(false);
     setShowSave(false);
     setSelectedNums([]);
     setSaveMemo('');
@@ -81,7 +62,6 @@ export default function AddTab({ tickets, setTickets }: AddTabProps) {
         </div>
       </div>
 
-      {/* Save modal */}
       {showSave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5" onClick={() => setShowSave(false)}>
           <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
@@ -101,7 +81,9 @@ export default function AddTab({ tickets, setTickets }: AddTabProps) {
             </div>
             <div className="flex gap-2.5">
               <button onClick={() => setShowSave(false)} className="px-5 py-3 rounded-lg border border-border text-muted-foreground text-sm hover:border-primary hover:text-primary transition">취소</button>
-              <button onClick={doSave} className="ml-auto px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-gold-glow transition">저장</button>
+              <button onClick={doSave} disabled={saving} className="ml-auto px-5 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-gold-glow transition disabled:opacity-50">
+                {saving ? '저장 중...' : '저장'}
+              </button>
             </div>
           </div>
         </div>
