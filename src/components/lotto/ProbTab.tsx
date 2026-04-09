@@ -296,7 +296,7 @@ export default function ProbTab({ tickets }: ProbTabProps) {
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setDropdownOpen(true); }}
               placeholder="번호로 검색하거나 클릭해서 선택..."
-              className="flex-1 bg-transparent border-none outline-none py-3.5 text-sm text-foreground placeholder:text-muted-foreground min-w-0"
+              className="flex-1 bg-transparent border-none outline-none py-3.5 text-base text-foreground placeholder:text-muted-foreground min-w-0"
               onClick={e => { e.stopPropagation(); setDropdownOpen(true); }}
             />
             {searchQuery && (
