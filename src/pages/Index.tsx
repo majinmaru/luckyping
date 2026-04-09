@@ -8,7 +8,7 @@ import ProbTab from '@/components/lotto/ProbTab';
 type Tab = 'add' | 'tickets' | 'prob';
 
 export default function Index() {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const [tab, setTab] = useState<Tab>('add');
   const { tickets, loading, addTicket, updateTicket, deleteTicket, deleteAllTickets } = useTickets();
 
