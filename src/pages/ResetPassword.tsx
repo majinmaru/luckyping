@@ -31,8 +31,8 @@ export default function ResetPassword() {
       toast.error('비밀번호가 일치하지 않습니다');
       return;
     }
-    if (password.length < 6) {
-      toast.error('비밀번호는 6자 이상이어야 합니다');
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      toast.error('비밀번호는 숫자, 영문, 특수문자 포함 8자리 이상이어야 합니다');
       return;
     }
 
