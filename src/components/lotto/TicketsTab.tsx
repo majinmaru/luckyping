@@ -223,7 +223,7 @@ export default function TicketsTab({ tickets, updateTicket, deleteTicket, delete
               <DatePickerField label="구매 일자" value={buyDate} onChange={setBuyDate} />
               <div className="mb-4">
                 <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
-                <input type="text" value={buyMemo} onChange={e => setBuyMemo(e.target.value)} placeholder="ex. 3회차 도전!" className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
+                <input type="text" value={buyMemo} onChange={e => setBuyMemo(e.target.value)} placeholder="ex. 3회차 도전!" className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
               </div>
               <div className="flex gap-2.5">
                 <button onClick={() => setBuyModal(null)} className="px-5 py-3 rounded-lg border border-border text-muted-foreground text-sm transition hover:border-primary hover:text-primary">취소</button>
