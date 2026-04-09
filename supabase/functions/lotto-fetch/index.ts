@@ -1,9 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from '@supabase/supabase-js/cors'
 
 interface DrawResult {
   drwNo: number;
@@ -15,10 +10,31 @@ interface DrawResult {
 async function fetchDraw(drwNo: number): Promise<DrawResult | null> {
   try {
     const res = await fetch(
-      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`
+      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'ko-KR,ko;q=0.9',
+          'Referer': 'https://www.dhlottery.co.kr/',
+        },
+        redirect: 'follow',
+      }
     );
-    const data = await res.json();
-    if (data.returnValue !== "success") return null;
+    
+    const text = await res.text();
+    
+    // Try parsing as JSON
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.log(`Draw ${drwNo}: non-JSON response (status ${res.status})`);
+      return null;
+    }
+    
+    if (data.returnValue !== 'success') return null;
+    
     return {
       drwNo: data.drwNo,
       drwNoDate: data.drwNoDate,
@@ -28,7 +44,8 @@ async function fetchDraw(drwNo: number): Promise<DrawResult | null> {
       ].sort((a: number, b: number) => a - b),
       bonusNo: data.bnusNo,
     };
-  } catch {
+  } catch (err) {
+    console.log(`Draw ${drwNo} fetch error: ${err.message}`);
     return null;
   }
 }
@@ -45,24 +62,23 @@ function getExpectedLatestDraw(): number {
   return drawDone ? weeks + 1 : weeks;
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const url = new URL(req.url);
-    const fromParam = url.searchParams.get("from");
+    const fromParam = url.searchParams.get('from');
     const from = fromParam ? parseInt(fromParam, 10) : 1;
     const expected = getExpectedLatestDraw();
+    const maxToFetch = Math.min(expected, from + 50);
 
-    // Only fetch draws from `from` to `expected` — should be a small delta
     const draws: DrawResult[] = [];
-    const maxToFetch = Math.min(expected, from + 50); // Safety cap: max 50 draws per call
 
-    // Batch fetch in parallel groups of 5
+    // Batch fetch in groups of 5
     for (let i = from; i <= maxToFetch; i += 5) {
-      const batch = [];
+      const batch: Promise<DrawResult | null>[] = [];
       for (let j = i; j < Math.min(i + 5, maxToFetch + 1); j++) {
         batch.push(fetchDraw(j));
       }
@@ -79,12 +95,12 @@ serve(async (req) => {
         fetchedFrom: from,
         fetchedTo: maxToFetch,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     return new Response(
       JSON.stringify({ error: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
