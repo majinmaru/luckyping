@@ -1,22 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTickets } from '@/hooks/use-tickets';
 import AddTab from '@/components/lotto/AddTab';
 import TicketsTab from '@/components/lotto/TicketsTab';
 import ProbTab from '@/components/lotto/ProbTab';
-import { loadTickets, type Ticket } from '@/lib/lotto';
 
 type Tab = 'add' | 'tickets' | 'prob';
 
 export default function Index() {
   const { signOut } = useAuth();
   const [tab, setTab] = useState<Tab>('add');
-  const [tickets, setTickets] = useState<Ticket[]>(() => loadTickets());
+  const { tickets, loading, addTicket, updateTicket, deleteTicket, deleteAllTickets } = useTickets();
 
   const tabs: { id: Tab; icon: string; label: string }[] = [
     { id: 'add', icon: '✍️', label: '번호입력' },
     { id: 'tickets', icon: '🎫', label: '내 티켓' },
     { id: 'prob', icon: '📊', label: '확률분석' },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-12 h-12 border-[3px] border-border border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -58,8 +66,8 @@ export default function Index() {
 
       {/* Content */}
       <div className="max-w-[600px] mx-auto p-5">
-        {tab === 'add' && <AddTab tickets={tickets} setTickets={setTickets} />}
-        {tab === 'tickets' && <TicketsTab tickets={tickets} setTickets={setTickets} />}
+        {tab === 'add' && <AddTab tickets={tickets} addTicket={addTicket} />}
+        {tab === 'tickets' && <TicketsTab tickets={tickets} updateTicket={updateTicket} deleteTicket={deleteTicket} deleteAllTickets={deleteAllTickets} />}
         {tab === 'prob' && <ProbTab tickets={tickets} />}
       </div>
 
