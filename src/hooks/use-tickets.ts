@@ -87,10 +87,10 @@ export function useTickets() {
 
   const updateTicket = useCallback(async (id: string, updates: Partial<Pick<Ticket, 'purchases' | 'wins'>>) => {
     if (!user) return;
-    const payload: Record<string, any> = {};
+    const payload: { purchases?: any; wins?: any } = {};
     if (updates.purchases) payload.purchases = updates.purchases;
     if (updates.wins) payload.wins = updates.wins;
-    const { error } = await supabase.from('tickets').update(payload).eq('id', id);
+    const { error } = await supabase.from('tickets').update(payload as any).eq('id', id);
     if (error) { toast.error('수정 실패'); return; }
     await fetchTickets();
   }, [user, fetchTickets]);
