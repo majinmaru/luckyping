@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTickets } from '@/hooks/use-tickets';
 import AddTab from '@/components/lotto/AddTab';
@@ -74,6 +75,11 @@ export default function Index() {
         <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary transition px-4 py-2 rounded-lg border border-border hover:border-primary mb-3">
           로그아웃
         </button>
+        <div className="flex items-center justify-center gap-3 text-[11px] text-muted-foreground mb-2">
+          <Link to="/terms" className="hover:text-primary transition">이용약관</Link>
+          <span>|</span>
+          <Link to="/privacy" className="hover:text-primary transition">개인정보 처리방침</Link>
+        </div>
         <p className="text-muted-foreground text-[11px]">© 2026 Jena. All rights reserved.</p>
       </footer>
     </div>
