@@ -56,11 +56,14 @@ export default function Auth() {
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin },
+    const result = await lovable.auth.signInWithOAuth(provider, {
+      redirect_uri: window.location.origin,
     });
-    if (error) toast.error(error.message);
+    if (result.error) {
+      toast.error(result.error instanceof Error ? result.error.message : '소셜 로그인 중 오류가 발생했습니다');
+    } else if (!result.redirected) {
+      navigate('/');
+    }
   };
 
   return (
