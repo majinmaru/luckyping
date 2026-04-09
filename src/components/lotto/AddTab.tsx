@@ -73,8 +73,8 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
              <DatePickerField label="구매 일자" value={saveDate} onChange={setSaveDate} />
             <div className="mb-4">
               <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
-              <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
-                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
+                <input type="text" value={saveMemo} onChange={e => setSaveMemo(e.target.value)} placeholder="ex. 이번주엔 꼭!"
+                className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
             </div>
             <div className="flex gap-2.5">
               <button onClick={() => setShowSave(false)} className="px-5 py-3 rounded-lg border border-border text-muted-foreground text-sm hover:border-primary hover:text-primary transition">취소</button>
