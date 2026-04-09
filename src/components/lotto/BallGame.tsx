@@ -59,7 +59,7 @@ export default function BallGame({ onComplete, addTicket }: BallGameProps) {
         attempts++;
       } while (overlap && attempts < 100);
 
-      const speed = 0.8 + Math.random() * 1.2;
+      const speed = 2.5 + Math.random() * 2.5;
       const angle = Math.random() * Math.PI * 2;
       balls.push({ n: i, x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r });
     }
