@@ -75,37 +75,66 @@ export function saveHistoryCache(history: DrawData[]) {
   localStorage.setItem('lotto_history', JSON.stringify(history));
 }
 
-// Fetch and normalize data
+// Edge function URL
+const EDGE_FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lotto-fetch`;
+
+// Fetch latest draw info only
+export async function fetchLatestDraw() {
+  const res = await fetch(`${EDGE_FN_URL}?mode=latest`);
+  if (!res.ok) throw new Error('최신 회차 조회 실패');
+  return res.json();
+}
+
+// Fetch full lotto data (all draws from `from` to latest)
 export async function fetchLottoData(force = false) {
-  const base = './data';
-  const suffix = force ? `?v=${Date.now()}` : '';
-  const [latestRaw, statsRaw, historyRaw] = await Promise.all([
-    fetch(`${base}/latest.json${suffix}`, { cache: force ? 'no-store' : 'default' }).then(r => r.json()),
-    fetch(`${base}/stats.json${suffix}`, { cache: force ? 'no-store' : 'default' }).then(r => r.json()),
-    fetch(`${base}/history.json${suffix}`, { cache: force ? 'no-store' : 'default' }).then(r => r.json()),
-  ]);
+  const cached = loadHistoryCache();
+  const cachedStats = loadStatsCache();
+  const from = force ? 1 : (cachedStats.latestDrwNo > 0 ? cachedStats.latestDrwNo + 1 : 1);
 
-  const draws: DrawData[] = (historyRaw?.draws || [])
-    .map((d: any) => ({
-      drwNo: Number(d.drwNo),
-      drwNoDate: d.drwNoDate,
-      nums: (d.nums || []).map(Number).sort((a: number, b: number) => a - b),
-      bonusNo: Number(d.bonusNo || 0),
-    }))
-    .filter((d: DrawData) => d.drwNo && d.nums.length === 6);
+  // First check latest available draw
+  const latestInfo = await fetchLatestDraw();
+  const latestAvailable = latestInfo.latestDrwNo || 0;
 
+  // If we already have the latest, no need to fetch
+  if (!force && cachedStats.latestDrwNo >= latestAvailable && cached.length > 0) {
+    return { stats: cachedStats, draws: cached };
+  }
+
+  // Fetch missing draws
+  const res = await fetch(`${EDGE_FN_URL}?from=${from}`);
+  if (!res.ok) throw new Error('데이터 조회 실패');
+  const data = await res.json();
+
+  const newDraws: DrawData[] = (data.draws || []).map((d: any) => ({
+    drwNo: Number(d.drwNo),
+    drwNoDate: d.drwNoDate,
+    nums: (d.nums || []).map(Number).sort((a: number, b: number) => a - b),
+    bonusNo: Number(d.bonusNo || 0),
+  })).filter((d: DrawData) => d.drwNo && d.nums.length === 6);
+
+  // Merge with cached draws (avoid duplicates)
+  let allDraws: DrawData[];
+  if (force) {
+    allDraws = newDraws;
+  } else {
+    const existingMap = new Map(cached.map(d => [d.drwNo, d]));
+    newDraws.forEach(d => existingMap.set(d.drwNo, d));
+    allDraws = Array.from(existingMap.values()).sort((a, b) => a.drwNo - b.drwNo);
+  }
+
+  // Build frequency
   const freq: Record<string, number> = {};
   for (let i = 1; i <= 45; i++) freq[i] = 0;
-  draws.forEach(d => d.nums.forEach(n => { freq[n] = (freq[n] || 0) + 1; }));
+  allDraws.forEach(d => d.nums.forEach(n => { freq[n] = (freq[n] || 0) + 1; }));
 
   const stats: StatsCache = {
-    freq: statsRaw?.freq || freq,
-    totalDraws: Number(statsRaw?.totalDraws || draws.length),
-    latestDrwNo: Number(latestRaw?.latestDrwNo || statsRaw?.latestDrwNo || 0),
-    updatedAt: latestRaw?.updatedAt || statsRaw?.updatedAt || null,
+    freq,
+    totalDraws: allDraws.length,
+    latestDrwNo: data.stats?.latestDrwNo || (allDraws.length > 0 ? allDraws[allDraws.length - 1].drwNo : 0),
+    updatedAt: new Date().toISOString(),
   };
 
-  return { stats, draws };
+  return { stats, draws: allDraws };
 }
 
 export function getExpectedLatestDrawKST(): number {
