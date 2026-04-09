@@ -43,7 +43,7 @@ export default function DatePickerField({ value, onChange, label }: Props) {
               {dateObj ? format(dateObj, 'yyyy-MM-dd') : '날짜 선택'}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="w-auto p-0 z-[60]" align="start">
             <Calendar
               mode="single"
               selected={dateObj}
