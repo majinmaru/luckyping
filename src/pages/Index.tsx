@@ -32,20 +32,10 @@ export default function Index() {
       <div className="relative overflow-hidden border-b border-border px-5 pt-7 pb-5 text-center"
         style={{ background: 'linear-gradient(135deg, hsl(240 20% 4%) 0%, hsl(280 15% 8%) 50%, hsl(240 20% 4%) 100%)' }}>
         <div className="absolute -top-[60px] left-1/2 -translate-x-1/2 w-[300px] h-[120px] bg-[radial-gradient(ellipse,rgba(245,200,66,0.15)_0%,transparent_70%)] pointer-events-none" />
-        <div className="flex items-center justify-between">
-          <div className="flex-1" />
-          <div className="text-center">
-            <h1 className="font-display text-[28px] tracking-wider text-primary" style={{ textShadow: '0 0 20px rgba(245,200,66,0.4)' }}>
-              🍀 행운은 내 손으로
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1 tracking-[4px] uppercase">lotto ticket recorder</p>
-          </div>
-          <div className="flex-1 flex justify-end">
-            <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary transition px-3 py-1.5 rounded-lg border border-border hover:border-primary">
-              로그아웃
-            </button>
-          </div>
-        </div>
+        <h1 className="font-display text-[28px] tracking-wider text-primary" style={{ textShadow: '0 0 20px rgba(245,200,66,0.4)' }}>
+          🍀 행운은 내 손으로
+        </h1>
+        <p className="text-xs text-muted-foreground mt-1 tracking-[4px] uppercase">lotto ticket recorder</p>
       </div>
 
       {/* Nav */}
