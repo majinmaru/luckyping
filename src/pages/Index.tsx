@@ -62,6 +62,9 @@ export default function Index() {
       </div>
 
       <footer className="max-w-[600px] mx-auto mt-1.5 px-5 pb-6 text-center">
+        {user?.email && (
+          <p className="text-[11px] text-muted-foreground mb-2 truncate">{user.email}</p>
+        )}
         <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary transition px-4 py-2 rounded-lg border border-border hover:border-primary mb-3">
           로그아웃
         </button>
