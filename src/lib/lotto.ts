@@ -57,9 +57,6 @@ export function saveHistoryCache(history: DrawData[]) {
   localStorage.setItem('lotto_history', JSON.stringify(history));
 }
 
-// Edge function URL
-const EDGE_FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lotto-fetch`;
-
 // Load seed data from static JSON (bundled with app, ~1216 draws)
 async function loadSeedData(): Promise<DrawData[]> {
   try {
@@ -77,17 +74,43 @@ async function loadSeedData(): Promise<DrawData[]> {
   }
 }
 
-// Fetch only missing draws from edge function
-async function fetchDelta(from: number): Promise<DrawData[]> {
-  const res = await fetch(`${EDGE_FN_URL}?from=${from}`);
-  if (!res.ok) throw new Error('델타 데이터 조회 실패');
-  const data = await res.json();
-  return (data.draws || []).map((d: any) => ({
-    drwNo: Number(d.drwNo),
-    drwNoDate: d.drwNoDate,
-    nums: (d.nums || []).map(Number).sort((a: number, b: number) => a - b),
-    bonusNo: Number(d.bonusNo || 0),
-  })).filter((d: DrawData) => d.drwNo && d.nums.length === 6);
+// Fetch a single draw directly from the official API (client-side, works for Korean users)
+async function fetchDrawDirect(drwNo: number): Promise<DrawData | null> {
+  try {
+    const res = await fetch(
+      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`
+    );
+    const data = await res.json();
+    if (data.returnValue !== 'success') return null;
+    return {
+      drwNo: data.drwNo,
+      drwNoDate: data.drwNoDate,
+      nums: [
+        data.drwtNo1, data.drwtNo2, data.drwtNo3,
+        data.drwtNo4, data.drwtNo5, data.drwtNo6,
+      ].sort((a: number, b: number) => a - b),
+      bonusNo: data.bnusNo,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Fetch missing draws directly from official API (client-side)
+async function fetchDelta(from: number, to: number): Promise<DrawData[]> {
+  const draws: DrawData[] = [];
+  // Batch in groups of 5
+  for (let i = from; i <= to; i += 5) {
+    const batch: Promise<DrawData | null>[] = [];
+    for (let j = i; j < Math.min(i + 5, to + 1); j++) {
+      batch.push(fetchDrawDirect(j));
+    }
+    const results = await Promise.all(batch);
+    for (const r of results) {
+      if (r) draws.push(r);
+    }
+  }
+  return draws;
 }
 
 function buildStats(draws: DrawData[]): StatsCache {
@@ -112,7 +135,7 @@ function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
 /**
  * Main data loading function.
  * 1. First load: use localStorage cache, if empty → load seed JSON (instant)
- * 2. Then fetch delta from edge function (only missing draws)
+ * 2. Then fetch delta directly from official API (client-side, only missing draws)
  * 3. Merge and save
  */
 export async function fetchLottoData(forceUpdate = false) {
@@ -137,17 +160,15 @@ export async function fetchLottoData(forceUpdate = false) {
     return { stats: cachedStats, draws: cached };
   }
 
-  // Step 3: Fetch only missing draws (delta)
+  // Step 3: Fetch only missing draws (delta) directly from official API
   const from = latestCached + 1;
   if (from > expected) {
-    // Nothing to fetch
     return { stats: cachedStats, draws: cached };
   }
 
-  const newDraws = await fetchDelta(from);
+  const newDraws = await fetchDelta(from, expected);
   
   if (newDraws.length === 0 && cached.length > 0) {
-    // API might not have new data yet, return cache
     return { stats: cachedStats, draws: cached };
   }
 
