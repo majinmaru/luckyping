@@ -3,9 +3,10 @@ interface Props {
 }
 
 const rules = [
-  { test: (p: string) => p.length >= 6, label: '6자 이상' },
+  { test: (p: string) => p.length >= 8, label: '8자 이상' },
   { test: (p: string) => /[A-Za-z]/.test(p), label: '영문 포함' },
   { test: (p: string) => /[0-9]/.test(p), label: '숫자 포함' },
+  { test: (p: string) => /[^A-Za-z0-9]/.test(p), label: '특수문자 포함' },
 ];
 
 export default function PasswordChecklist({ password }: Props) {

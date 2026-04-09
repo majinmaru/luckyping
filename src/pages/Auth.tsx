@@ -26,8 +26,8 @@ export default function Auth() {
           setLoading(false);
           return;
         }
-        if (password.length < 6) {
-          toast.error('비밀번호는 6자 이상이어야 합니다');
+        if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+          toast.error('비밀번호는 숫자, 영문, 특수문자 포함 8자리 이상이어야 합니다');
           setLoading(false);
           return;
         }
@@ -106,9 +106,9 @@ export default function Auth() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="숫자, 영문, 특수문자 포함 8자리"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full rounded-lg border border-border bg-surface2 px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                 />
               </div>
@@ -121,9 +121,9 @@ export default function Auth() {
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="비밀번호 재입력"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full rounded-lg border border-border bg-surface2 px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                 />
               </div>
