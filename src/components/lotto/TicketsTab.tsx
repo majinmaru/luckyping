@@ -220,10 +220,7 @@ export default function TicketsTab({ tickets, updateTicket, deleteTicket, delete
             <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
               <h3 className="font-display text-lg text-primary mb-5">🛒 구매 이력 추가</h3>
               <div className="flex gap-1.5 flex-wrap mb-5">{t.nums.map(n => <MiniBall key={n} n={n} size={34} />)}</div>
-              <div className="mb-4">
-                <label className="block text-xs text-muted-foreground mb-2 tracking-widest">구매 일자</label>
-                <input type="date" value={buyDate} onChange={e => setBuyDate(e.target.value)} className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary" />
-              </div>
+              <DatePickerField label="구매 일자" value={buyDate} onChange={setBuyDate} />
               <div className="mb-4">
                 <label className="block text-xs text-muted-foreground mb-2 tracking-widest">메모 (선택)</label>
                 <input type="text" value={buyMemo} onChange={e => setBuyMemo(e.target.value)} placeholder="ex. 3회차 도전!" className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
