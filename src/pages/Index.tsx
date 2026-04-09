@@ -62,6 +62,11 @@ export default function Index() {
         {tab === 'prob' && <ProbTab tickets={tickets} />}
       </div>
 
+      {/* Ad Banner */}
+      <div className="max-w-[600px] mx-auto px-5 mt-4">
+        <AdBanner adSlot="YOUR_AD_SLOT_ID" format="horizontal" />
+      </div>
+
       <footer className="max-w-[600px] mx-auto mt-1.5 px-5 pb-6 text-center">
         {user?.email && (
           <p className="text-[11px] text-muted-foreground mb-2 truncate">{user.email}</p>
