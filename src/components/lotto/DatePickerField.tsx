@@ -25,7 +25,8 @@ export default function DatePickerField({ value, onChange, label }: Props) {
           type="date"
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground focus:outline-none focus:border-primary max-w-full"
+          className="w-full min-w-0 bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground focus:outline-none focus:border-primary box-border"
+          style={{ maxWidth: '100%' }}
         />
       </div>
 
