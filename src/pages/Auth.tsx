@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
 import { toast } from 'sonner';
+import PasswordChecklist from '@/components/auth/PasswordChecklist';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
