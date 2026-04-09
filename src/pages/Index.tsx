@@ -3,12 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTickets } from '@/hooks/use-tickets';
 import AddTab from '@/components/lotto/AddTab';
-import BallGame from '@/components/lotto/BallGame';
 import TicketsTab from '@/components/lotto/TicketsTab';
 import ProbTab from '@/components/lotto/ProbTab';
 import AdBanner from '@/components/AdBanner';
 
-type Tab = 'add' | 'game' | 'tickets' | 'prob';
+type Tab = 'add' | 'tickets' | 'prob';
 
 export default function Index() {
   const { user, signOut } = useAuth();
