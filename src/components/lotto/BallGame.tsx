@@ -122,15 +122,18 @@ export default function BallGame({ onComplete, addTicket }: BallGameProps) {
 
         b.x += b.vx;
         b.y += b.vy;
-        b.vy += 0.02;
-        b.vx *= 0.9995;
-        b.vy *= 0.9995;
+        b.vy += 0.01;
 
+        // Keep balls fast
         const speed = Math.hypot(b.vx, b.vy);
-        if (speed < 0.5) {
+        if (speed < 2) {
           const angle = Math.random() * Math.PI * 2;
-          b.vx += Math.cos(angle) * 0.3;
-          b.vy += Math.sin(angle) * 0.3;
+          b.vx += Math.cos(angle) * 1.5;
+          b.vy += Math.sin(angle) * 1.5;
+        } else if (speed > 6) {
+          const scale = 6 / speed;
+          b.vx *= scale;
+          b.vy *= scale;
         }
 
         if (b.x - b.r < 0) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.9; }
