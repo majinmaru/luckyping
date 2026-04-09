@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MiniBall } from './BallGrid';
-import type { Ticket, StatsCache, DrawData } from '@/lib/lotto';
+import type { Ticket } from '@/hooks/use-tickets';
 import { loadStatsCache, saveStatsCache, loadHistoryCache, saveHistoryCache, fetchLottoData, getUpdateStatusText, getExpectedLatestDrawKST, colorClass } from '@/lib/lotto';
 import { toast } from 'sonner';
 
