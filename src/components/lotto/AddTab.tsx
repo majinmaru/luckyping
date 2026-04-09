@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BallGrid, SelectedRow, MiniBall } from './BallGrid';
 import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
+import DatePickerField from './DatePickerField';
 
 interface AddTabProps {
   tickets: Ticket[];
