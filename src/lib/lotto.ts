@@ -32,25 +32,7 @@ export interface DrawData {
   bonusNo: number;
 }
 
-// Load tickets from localStorage
-export function loadTickets(): Ticket[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem('lotto_tickets') || '[]');
-    return raw.map((t: any, i: number) => ({
-      ...t,
-      createdAt: t.createdAt || (Date.now() - (raw.length - i) * 60000),
-      updatedAt: t.updatedAt || (Date.now() - (raw.length - i) * 60000),
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export function saveTickets(tickets: Ticket[]) {
-  localStorage.setItem('lotto_tickets', JSON.stringify(tickets));
-}
-
-// Stats & history from localStorage cache
+// Load/save from localStorage
 export function loadStatsCache(): StatsCache {
   try {
     const s = localStorage.getItem('lotto_stats');
@@ -78,61 +60,100 @@ export function saveHistoryCache(history: DrawData[]) {
 // Edge function URL
 const EDGE_FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lotto-fetch`;
 
-// Fetch latest draw info only
-export async function fetchLatestDraw() {
-  const res = await fetch(`${EDGE_FN_URL}?mode=latest`);
-  if (!res.ok) throw new Error('최신 회차 조회 실패');
-  return res.json();
+// Load seed data from static JSON (bundled with app, ~1216 draws)
+async function loadSeedData(): Promise<DrawData[]> {
+  try {
+    const res = await fetch('/data/history.json');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.draws || []).map((d: any) => ({
+      drwNo: Number(d.drwNo),
+      drwNoDate: d.drwNoDate,
+      nums: (d.nums || []).map(Number).sort((a: number, b: number) => a - b),
+      bonusNo: Number(d.bonusNo || 0),
+    })).filter((d: DrawData) => d.drwNo && d.nums.length === 6);
+  } catch {
+    return [];
+  }
 }
 
-// Fetch full lotto data (all draws from `from` to latest)
-export async function fetchLottoData(force = false) {
-  const cached = loadHistoryCache();
-  const cachedStats = loadStatsCache();
-  const from = force ? 1 : (cachedStats.latestDrwNo > 0 ? cachedStats.latestDrwNo + 1 : 1);
-
-  // First check latest available draw
-  const latestInfo = await fetchLatestDraw();
-  const latestAvailable = latestInfo.latestDrwNo || 0;
-
-  // If we already have the latest, no need to fetch
-  if (!force && cachedStats.latestDrwNo >= latestAvailable && cached.length > 0) {
-    return { stats: cachedStats, draws: cached };
-  }
-
-  // Fetch missing draws
+// Fetch only missing draws from edge function
+async function fetchDelta(from: number): Promise<DrawData[]> {
   const res = await fetch(`${EDGE_FN_URL}?from=${from}`);
-  if (!res.ok) throw new Error('데이터 조회 실패');
+  if (!res.ok) throw new Error('델타 데이터 조회 실패');
   const data = await res.json();
-
-  const newDraws: DrawData[] = (data.draws || []).map((d: any) => ({
+  return (data.draws || []).map((d: any) => ({
     drwNo: Number(d.drwNo),
     drwNoDate: d.drwNoDate,
     nums: (d.nums || []).map(Number).sort((a: number, b: number) => a - b),
     bonusNo: Number(d.bonusNo || 0),
   })).filter((d: DrawData) => d.drwNo && d.nums.length === 6);
+}
 
-  // Merge with cached draws (avoid duplicates)
-  let allDraws: DrawData[];
-  if (force) {
-    allDraws = newDraws;
-  } else {
-    const existingMap = new Map(cached.map(d => [d.drwNo, d]));
-    newDraws.forEach(d => existingMap.set(d.drwNo, d));
-    allDraws = Array.from(existingMap.values()).sort((a, b) => a.drwNo - b.drwNo);
-  }
-
-  // Build frequency
+function buildStats(draws: DrawData[]): StatsCache {
   const freq: Record<string, number> = {};
   for (let i = 1; i <= 45; i++) freq[i] = 0;
-  allDraws.forEach(d => d.nums.forEach(n => { freq[n] = (freq[n] || 0) + 1; }));
-
-  const stats: StatsCache = {
+  draws.forEach(d => d.nums.forEach(n => { freq[n] = (freq[n] || 0) + 1; }));
+  const latest = draws.length > 0 ? draws[draws.length - 1].drwNo : 0;
+  return {
     freq,
-    totalDraws: allDraws.length,
-    latestDrwNo: data.stats?.latestDrwNo || (allDraws.length > 0 ? allDraws[allDraws.length - 1].drwNo : 0),
+    totalDraws: draws.length,
+    latestDrwNo: latest,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
+  const map = new Map(existing.map(d => [d.drwNo, d]));
+  newDraws.forEach(d => map.set(d.drwNo, d));
+  return Array.from(map.values()).sort((a, b) => a.drwNo - b.drwNo);
+}
+
+/**
+ * Main data loading function.
+ * 1. First load: use localStorage cache, if empty → load seed JSON (instant)
+ * 2. Then fetch delta from edge function (only missing draws)
+ * 3. Merge and save
+ */
+export async function fetchLottoData(forceUpdate = false) {
+  let cached = loadHistoryCache();
+  let cachedStats = loadStatsCache();
+
+  // Step 1: If no cache, load seed data (instant, from static file)
+  if (cached.length === 0) {
+    cached = await loadSeedData();
+    if (cached.length > 0) {
+      cachedStats = buildStats(cached);
+      saveHistoryCache(cached);
+      saveStatsCache(cachedStats);
+    }
+  }
+
+  const latestCached = cachedStats.latestDrwNo || 0;
+  const expected = getExpectedLatestDrawKST();
+
+  // Step 2: If already up to date and not forcing, return cache
+  if (!forceUpdate && latestCached >= expected && cached.length > 0) {
+    return { stats: cachedStats, draws: cached };
+  }
+
+  // Step 3: Fetch only missing draws (delta)
+  const from = latestCached + 1;
+  if (from > expected) {
+    // Nothing to fetch
+    return { stats: cachedStats, draws: cached };
+  }
+
+  const newDraws = await fetchDelta(from);
+  
+  if (newDraws.length === 0 && cached.length > 0) {
+    // API might not have new data yet, return cache
+    return { stats: cachedStats, draws: cached };
+  }
+
+  // Merge
+  const allDraws = mergeDraws(cached, newDraws);
+  const stats = buildStats(allDraws);
 
   return { stats, draws: allDraws };
 }

@@ -40,7 +40,6 @@ function getExpectedLatestDraw(): number {
   const day = kst.getUTCDay();
   const hour = kst.getUTCHours();
   const minute = kst.getUTCMinutes();
-  // Draw happens Saturday ~20:45 KST, results available ~20:50
   const drawDone = day !== 6 || hour > 20 || (hour === 20 && minute >= 50);
   const weeks = Math.floor((kst.getTime() - firstDrawUtc) / (7 * 24 * 60 * 60 * 1000));
   return drawDone ? weeks + 1 : weeks;
@@ -57,41 +56,14 @@ serve(async (req) => {
     const from = fromParam ? parseInt(fromParam, 10) : 1;
     const expected = getExpectedLatestDraw();
 
-    // If "latest" mode — just fetch the latest few draws
-    const mode = url.searchParams.get("mode");
-
-    if (mode === "latest") {
-      // Try to find the actual latest available draw
-      let latestDrwNo = expected;
-      let latestDraw: DrawResult | null = null;
-      
-      // Try expected, then go back up to 2 weeks
-      for (let i = 0; i < 3; i++) {
-        latestDraw = await fetchDraw(latestDrwNo - i);
-        if (latestDraw) {
-          latestDrwNo = latestDraw.drwNo;
-          break;
-        }
-      }
-
-      return new Response(
-        JSON.stringify({
-          latestDrwNo: latestDraw?.drwNo || 0,
-          expectedDrwNo: expected,
-          latestDraw,
-          updatedAt: new Date().toISOString(),
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // "range" mode — fetch draws from `from` to latest
+    // Only fetch draws from `from` to `expected` — should be a small delta
     const draws: DrawResult[] = [];
-    const batchSize = 5;
+    const maxToFetch = Math.min(expected, from + 50); // Safety cap: max 50 draws per call
 
-    for (let i = from; i <= expected; i += batchSize) {
+    // Batch fetch in parallel groups of 5
+    for (let i = from; i <= maxToFetch; i += 5) {
       const batch = [];
-      for (let j = i; j < Math.min(i + batchSize, expected + 1); j++) {
+      for (let j = i; j < Math.min(i + 5, maxToFetch + 1); j++) {
         batch.push(fetchDraw(j));
       }
       const results = await Promise.all(batch);
@@ -100,22 +72,12 @@ serve(async (req) => {
       }
     }
 
-    // Build frequency map
-    const freq: Record<number, number> = {};
-    for (let n = 1; n <= 45; n++) freq[n] = 0;
-    draws.forEach((d) => d.nums.forEach((n) => { freq[n]++; }));
-
-    const latestDraw = draws.length > 0 ? draws[draws.length - 1] : null;
-
     return new Response(
       JSON.stringify({
-        stats: {
-          freq,
-          totalDraws: draws.length,
-          latestDrwNo: latestDraw?.drwNo || 0,
-          updatedAt: new Date().toISOString(),
-        },
         draws: draws.sort((a, b) => a.drwNo - b.drwNo),
+        expectedDrwNo: expected,
+        fetchedFrom: from,
+        fetchedTo: maxToFetch,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
