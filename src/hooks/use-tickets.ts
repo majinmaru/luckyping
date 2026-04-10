@@ -64,10 +64,9 @@ export function useTickets() {
     const existing = tickets.find(t => t.nums.join(',') === sorted.join(','));
     if (existing) {
       const newPurchases = [...existing.purchases, purchase].sort((a, b) => b.date.localeCompare(a.date));
-      const { error } = await supabase
-        .from('tickets')
-        .update({ purchases: newPurchases as any })
-        .eq('id', existing.id);
+      const { error } = await supabase.functions.invoke('ticket-update', {
+        body: { ticketId: existing.id, purchases: newPurchases },
+      });
       if (error) { toast.error('저장 실패'); return; }
       toast('✅ 기존 티켓에 구매 이력 추가');
     } else {
