@@ -64,10 +64,9 @@ export function useTickets() {
     const existing = tickets.find(t => t.nums.join(',') === sorted.join(','));
     if (existing) {
       const newPurchases = [...existing.purchases, purchase].sort((a, b) => b.date.localeCompare(a.date));
-      const { error } = await supabase
-        .from('tickets')
-        .update({ purchases: newPurchases as any })
-        .eq('id', existing.id);
+      const { error } = await supabase.functions.invoke('ticket-update', {
+        body: { ticketId: existing.id, purchases: newPurchases },
+      });
       if (error) { toast.error('저장 실패'); return; }
       toast('✅ 기존 티켓에 구매 이력 추가');
     } else {
@@ -87,10 +86,10 @@ export function useTickets() {
 
   const updateTicket = useCallback(async (id: string, updates: Partial<Pick<Ticket, 'purchases' | 'wins'>>) => {
     if (!user) return;
-    const payload: { purchases?: any; wins?: any } = {};
-    if (updates.purchases) payload.purchases = updates.purchases;
-    if (updates.wins) payload.wins = updates.wins;
-    const { error } = await supabase.from('tickets').update(payload as any).eq('id', id);
+    const body: { ticketId: string; purchases?: any; wins?: any } = { ticketId: id };
+    if (updates.purchases) body.purchases = updates.purchases;
+    if (updates.wins) body.wins = updates.wins;
+    const { error } = await supabase.functions.invoke('ticket-update', { body });
     if (error) { toast.error('수정 실패'); return; }
     await fetchTickets();
   }, [user, fetchTickets]);
