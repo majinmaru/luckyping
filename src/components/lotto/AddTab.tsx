@@ -95,7 +95,7 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
 
           {showSave && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5" onClick={() => setShowSave(false)}>
-              <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <div className="bg-card border border-border rounded-lg p-5 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
                 <h3 className="font-display text-lg text-primary mb-5">✅ 티켓 저장</h3>
                 <div className="flex gap-1.5 flex-wrap mb-5">
                   {[...selectedNums].sort((a, b) => a - b).map(n => <MiniBall key={n} n={n} size={34} />)}

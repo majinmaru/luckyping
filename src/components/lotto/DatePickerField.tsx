@@ -20,13 +20,13 @@ export default function DatePickerField({ value, onChange, label }: Props) {
       <label className="block text-xs text-muted-foreground mb-2 tracking-widest">{label}</label>
 
       {/* Mobile: native date input, PC: calendar popover */}
-      <div className="block md:hidden">
+      <div className="block md:hidden overflow-hidden">
         <input
           type="date"
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-full min-w-0 bg-surface2 border border-border rounded-lg px-4 py-3 text-base text-foreground focus:outline-none focus:border-primary box-border"
-          style={{ maxWidth: '100%' }}
+          className="w-full min-w-0 bg-surface2 border border-border rounded-lg px-3 py-3 text-sm text-foreground focus:outline-none focus:border-primary box-border"
+          style={{ maxWidth: '100%', WebkitAppearance: 'none' }}
         />
       </div>
 
