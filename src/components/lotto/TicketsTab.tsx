@@ -217,7 +217,7 @@ export default function TicketsTab({ tickets, updateTicket, deleteTicket, delete
         if (!t) return null;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5" onClick={() => setBuyModal(null)}>
-            <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="bg-card border border-border rounded-lg p-5 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
               <h3 className="font-display text-lg text-primary mb-5">🛒 구매 이력 추가</h3>
               <div className="flex gap-1.5 flex-wrap mb-5">{t.nums.map(n => <MiniBall key={n} n={n} size={34} />)}</div>
               <DatePickerField label="구매 일자" value={buyDate} onChange={setBuyDate} />
@@ -240,7 +240,7 @@ export default function TicketsTab({ tickets, updateTicket, deleteTicket, delete
         if (!t) return null;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5" onClick={() => setWinModal(null)}>
-            <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="bg-card border border-border rounded-lg p-5 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
               <h3 className="font-display text-lg text-primary mb-5">🏆 당첨 기록 추가</h3>
               <div className="flex gap-1.5 flex-wrap mb-5">{t.nums.map(n => <MiniBall key={n} n={n} size={34} />)}</div>
               <DatePickerField label="당첨 일자" value={winDate} onChange={setWinDate} />
