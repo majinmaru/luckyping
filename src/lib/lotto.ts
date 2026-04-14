@@ -119,12 +119,62 @@ function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
   return Array.from(map.values()).sort((a, b) => a.drwNo - b.drwNo);
 }
 
+// ─── Client-side API fetch (bypasses server blocking) ───
+
+async function fetchDrawFromAPI(drwNo: number): Promise<DrawData | null> {
+  try {
+    const res = await fetch(
+      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`
+    );
+    const text = await res.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { return null; }
+    if (data.returnValue !== 'success') return null;
+    return {
+      drwNo: data.drwNo,
+      drwNoDate: data.drwNoDate,
+      nums: [
+        data.drwtNo1, data.drwtNo2, data.drwtNo3,
+        data.drwtNo4, data.drwtNo5, data.drwtNo6,
+      ].sort((a: number, b: number) => a - b),
+      bonusNo: data.bnusNo,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<DrawData[]> {
+  const missing: DrawData[] = [];
+  for (let i = latestInDb + 1; i <= expected; i++) {
+    const draw = await fetchDrawFromAPI(i);
+    if (draw) missing.push(draw);
+  }
+  if (missing.length === 0) return [];
+
+  // Send to Edge Function for DB persistence
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.functions.invoke('lotto-sync', {
+        method: 'POST',
+        body: { draws: missing },
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to sync draws to DB:', err);
+  }
+
+  return missing;
+}
+
 /**
  * Main data loading flow (DB-first):
  * 
  * 1. localStorage cache → instant display
  * 2. DB delta → picks up new draws since cache
  * 3. If cache was empty, full DB load
+ * 4. If DB is still behind expected, client-side API fetch + Edge Function sync
  */
 export async function fetchLottoData(forceUpdate = false) {
   // Step 1: localStorage cache (instant)
@@ -145,16 +195,26 @@ export async function fetchLottoData(forceUpdate = false) {
       saveHistoryCache(draws);
       saveStatsCache(stats);
     }
-    return { stats, draws };
+  } else {
+    // Step 3: No cache — full DB load
+    const allDraws = await fetchAllDrawsFromDB();
+    if (allDraws.length > 0) {
+      draws = allDraws;
+      stats = buildStats(draws);
+      saveHistoryCache(draws);
+      saveStatsCache(stats);
+    }
   }
 
-  // Step 3: No cache — full DB load
-  const allDraws = await fetchAllDrawsFromDB();
-  if (allDraws.length > 0) {
-    draws = allDraws;
-    stats = buildStats(draws);
-    saveHistoryCache(draws);
-    saveStatsCache(stats);
+  // Step 4: If DB is behind, fetch from client and sync
+  if (stats.latestDrwNo < expected) {
+    const clientDraws = await syncMissingDrawsViaClient(stats.latestDrwNo, expected);
+    if (clientDraws.length > 0) {
+      draws = mergeDraws(draws, clientDraws);
+      stats = buildStats(draws);
+      saveHistoryCache(draws);
+      saveStatsCache(stats);
+    }
   }
 
   return { stats, draws };
