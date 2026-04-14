@@ -1,53 +1,36 @@
 
 
-## 보안 문제 분석
+## 확률분석 탭 최신회차 동기화 수정
 
-현재 `tickets` 테이블의 UPDATE RLS 정책이 `auth.uid() = user_id`만 확인하므로, 사용자가 Supabase API를 직접 호출해 `wins` 데이터를 임의로 조작할 수 있습니다.
+### 문제
+Edge Function에서 dhlottery.co.kr API 호출 시 서버 차단(HTML 리다이렉트)으로 데이터 수집 실패
 
-## 해결 방안: Edge Function을 통한 서버 사이드 업데이트
+### 해결: 클라이언트 하이브리드 동기화
 
-`wins`와 `purchases` 업데이트를 서버(Edge Function)에서만 처리하도록 변경합니다.
+브라우저는 차단되지 않으므로, 클라이언트에서 직접 API 호출 후 Edge Function을 통해 DB에 저장
 
-### 1. Postgres 트리거 추가 (클라이언트 직접 수정 차단)
+### 변경 사항
 
-`BEFORE UPDATE` 트리거를 생성해서, service_role이 아닌 일반 사용자가 `wins` 또는 `purchases` 컬럼을 변경하려고 하면 차단합니다.
+**1. `src/lib/lotto.ts`**
+- `fetchDrawFromAPI(drwNo)` 함수 추가 — 브라우저에서 dhlottery API 직접 호출
+- `fetchLottoData()` 내에서 DB가 expected보다 뒤처져 있으면:
+  - 누락된 회차를 클라이언트에서 fetch
+  - `lotto-sync` Edge Function에 POST로 전달
+  - 로컬 캐시 업데이트
 
-```sql
-CREATE OR REPLACE FUNCTION public.protect_ticket_sensitive_columns()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF current_setting('role') != 'service_role' THEN
-    IF NEW.wins IS DISTINCT FROM OLD.wins THEN
-      RAISE EXCEPTION 'wins column cannot be modified by client';
-    END IF;
-    IF NEW.purchases IS DISTINCT FROM OLD.purchases THEN
-      RAISE EXCEPTION 'purchases column cannot be modified by client';
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-```
+**2. `supabase/functions/lotto-sync/index.ts`**
+- POST 요청 시 body에서 draw 데이터를 받아 DB에 upsert하는 모드 추가
+- JWT 인증으로 authenticated 사용자만 허용
+- 입력값 검증 (drwNo 범위, nums 배열 길이/범위 등)
 
-### 2. Edge Function 생성 (`ticket-update`)
+### 성능
+- 평소: DB delta 조회만 (수십 ms)
+- 새 회차 누락 시: 첫 접속 사용자만 ~1초, 이후 즉시
 
-`wins`와 `purchases` 업데이트를 처리하는 Edge Function을 만들어, service_role 키로 DB를 업데이트합니다.
-
-- JWT 인증으로 요청자 확인
-- 본인 소유 티켓만 수정 가능하도록 검증
-- 입력값 유효성 검사 (Zod)
-
-### 3. 클라이언트 코드 수정 (`use-tickets.ts`)
-
-`updateTicket` 함수가 직접 `supabase.from('tickets').update()`를 호출하는 대신, Edge Function을 `supabase.functions.invoke('ticket-update', ...)`로 호출하도록 변경합니다.
-
-`addTicket`에서 기존 티켓에 구매 이력을 추가하는 부분도 동일하게 Edge Function을 통해 처리합니다.
-
-### 변경 파일 목록
+### 파일 목록
 
 | 파일 | 작업 |
 |------|------|
-| DB 마이그레이션 | `protect_ticket_sensitive_columns` 트리거 생성 |
-| `supabase/functions/ticket-update/index.ts` | 새 Edge Function 생성 |
-| `src/hooks/use-tickets.ts` | `updateTicket`, `addTicket` → Edge Function 호출로 변경 |
+| `src/lib/lotto.ts` | 클라이언트 직접 API 호출 + Edge Function 전달 로직 추가 |
+| `supabase/functions/lotto-sync/index.ts` | POST body 수신 → DB upsert 모드 추가, JWT 인증 |
 
