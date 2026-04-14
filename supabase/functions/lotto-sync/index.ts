@@ -5,54 +5,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface DrawResult {
+interface DrawInput {
   drwNo: number
   drwNoDate: string
   nums: number[]
   bonusNo: number
 }
 
-async function fetchDraw(drwNo: number): Promise<DrawResult | null> {
-  try {
-    const res = await fetch(
-      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'ko-KR,ko;q=0.9',
-          'Referer': 'https://www.dhlottery.co.kr/',
-        },
-      }
-    )
-    const text = await res.text()
-    let data
-    try { data = JSON.parse(text) } catch { return null }
-    if (data.returnValue !== 'success') return null
-    return {
-      drwNo: data.drwNo,
-      drwNoDate: data.drwNoDate,
-      nums: [
-        data.drwtNo1, data.drwtNo2, data.drwtNo3,
-        data.drwtNo4, data.drwtNo5, data.drwtNo6,
-      ].sort((a: number, b: number) => a - b),
-      bonusNo: data.bnusNo,
-    }
-  } catch (err) {
-    console.error(`Draw ${drwNo} fetch error:`, err)
-    return null
-  }
-}
-
-function getExpectedLatestDraw(): number {
-  const firstDrawUtc = Date.UTC(2002, 11, 7, 11, 40, 0)
-  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
-  const day = kst.getUTCDay()
-  const hour = kst.getUTCHours()
-  const minute = kst.getUTCMinutes()
-  const drawDone = day !== 6 || hour > 20 || (hour === 20 && minute >= 50)
-  const weeks = Math.floor((kst.getTime() - firstDrawUtc) / (7 * 24 * 60 * 60 * 1000))
-  return drawDone ? weeks + 1 : weeks
+function validateDraw(d: unknown): d is DrawInput {
+  if (!d || typeof d !== 'object') return false
+  const obj = d as Record<string, unknown>
+  if (typeof obj.drwNo !== 'number' || obj.drwNo < 1 || obj.drwNo > 9999) return false
+  if (typeof obj.drwNoDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(obj.drwNoDate)) return false
+  if (!Array.isArray(obj.nums) || obj.nums.length !== 6) return false
+  if (!obj.nums.every((n: unknown) => typeof n === 'number' && n >= 1 && n <= 45)) return false
+  if (typeof obj.bonusNo !== 'number' || obj.bonusNo < 1 || obj.bonusNo > 45) return false
+  return true
 }
 
 Deno.serve(async (req) => {
@@ -65,7 +33,67 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    // Find the latest draw in DB
+    // POST: client sends draw data to upsert
+    if (req.method === 'POST') {
+      // Verify JWT - must be authenticated
+      const authHeader = req.headers.get('authorization')
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid token' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const body = await req.json()
+      const draws: unknown[] = Array.isArray(body.draws) ? body.draws : [body]
+
+      const validDraws: DrawInput[] = []
+      for (const d of draws) {
+        if (!validateDraw(d)) {
+          return new Response(JSON.stringify({ error: 'Invalid draw data', received: d }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+        validDraws.push(d)
+      }
+
+      if (validDraws.length === 0) {
+        return new Response(JSON.stringify({ error: 'No valid draws' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const rows = validDraws.map(d => ({
+        drw_no: d.drwNo,
+        drw_no_date: d.drwNoDate,
+        nums: d.nums.sort((a, b) => a - b),
+        bonus_no: d.bonusNo,
+      }))
+
+      const { error } = await supabase
+        .from('lotto_draws')
+        .upsert(rows, { onConflict: 'drw_no' })
+
+      if (error) {
+        console.error('Upsert error:', error)
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(
+        JSON.stringify({ message: `Upserted ${validDraws.length} draws`, drwNos: validDraws.map(d => d.drwNo) }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // GET: legacy server-side fetch (may fail due to API blocking)
     const { data: latestRow } = await supabase
       .from('lotto_draws')
       .select('drw_no')
@@ -73,50 +101,8 @@ Deno.serve(async (req) => {
       .limit(1)
       .single()
 
-    const latestInDb = latestRow?.drw_no || 0
-    const expected = getExpectedLatestDraw()
-
-    if (latestInDb >= expected) {
-      return new Response(
-        JSON.stringify({ message: 'Already up to date', latestInDb, expected }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const newDraws: DrawResult[] = []
-    for (let i = latestInDb + 1; i <= expected; i += 5) {
-      const batch: Promise<DrawResult | null>[] = []
-      for (let j = i; j < Math.min(i + 5, expected + 1); j++) {
-        batch.push(fetchDraw(j))
-      }
-      const results = await Promise.all(batch)
-      for (const r of results) {
-        if (r) newDraws.push(r)
-      }
-    }
-
-    if (newDraws.length > 0) {
-      const rows = newDraws.map(d => ({
-        drw_no: d.drwNo,
-        drw_no_date: d.drwNoDate,
-        nums: d.nums,
-        bonus_no: d.bonusNo,
-      }))
-      for (let i = 0; i < rows.length; i += 50) {
-        const { error } = await supabase
-          .from('lotto_draws')
-          .upsert(rows.slice(i, i + 50), { onConflict: 'drw_no' })
-        if (error) console.error('Upsert error:', error)
-      }
-    }
-
     return new Response(
-      JSON.stringify({
-        message: `Synced ${newDraws.length} new draws`,
-        latestInDb,
-        expected,
-        newDraws: newDraws.map(d => d.drwNo),
-      }),
+      JSON.stringify({ latestInDb: latestRow?.drw_no || 0 }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
