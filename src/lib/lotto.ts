@@ -237,17 +237,19 @@ export async function fetchLottoData(forceUpdate = false) {
   }
 
   // Step 4: If DB is behind, fetch from client and sync
+  let syncFailed = false;
   if (stats.latestDrwNo < expected) {
-    const clientDraws = await syncMissingDrawsViaClient(stats.latestDrwNo, expected);
-    if (clientDraws.length > 0) {
-      draws = mergeDraws(draws, clientDraws);
+    const result = await syncMissingDrawsViaClient(stats.latestDrwNo, expected);
+    syncFailed = result.failed;
+    if (result.draws.length > 0) {
+      draws = mergeDraws(draws, result.draws);
       stats = buildStats(draws);
       saveHistoryCache(draws);
       saveStatsCache(stats);
     }
   }
 
-  return { stats, draws };
+  return { stats, draws, syncFailed };
 }
 
 export function getExpectedLatestDrawKST(): number {
