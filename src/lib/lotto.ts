@@ -121,27 +121,49 @@ function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
 
 // ─── Client-side API fetch (bypasses server blocking) ───
 
+// CORS proxies (fallback chain). dhlottery API blocks browser direct calls,
+// so we route through public CORS proxies to obtain JSON.
+const CORS_PROXIES = [
+  (target: string) => `https://corsproxy.io/?${encodeURIComponent(target)}`,
+  (target: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+  (target: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`,
+];
+
+function isValidDrawPayload(data: any, drwNo: number): boolean {
+  if (!data || data.returnValue !== 'success') return false;
+  if (data.drwNo !== drwNo) return false;
+  const nums = [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6];
+  if (!nums.every((n) => typeof n === 'number' && n >= 1 && n <= 45)) return false;
+  if (typeof data.bnusNo !== 'number' || data.bnusNo < 1 || data.bnusNo > 45) return false;
+  if (typeof data.drwNoDate !== 'string') return false;
+  return true;
+}
+
 async function fetchDrawFromAPI(drwNo: number): Promise<DrawData | null> {
-  try {
-    const res = await fetch(
-      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`
-    );
-    const text = await res.text();
-    let data: any;
-    try { data = JSON.parse(text); } catch { return null; }
-    if (data.returnValue !== 'success') return null;
-    return {
-      drwNo: data.drwNo,
-      drwNoDate: data.drwNoDate,
-      nums: [
-        data.drwtNo1, data.drwtNo2, data.drwtNo3,
-        data.drwtNo4, data.drwtNo5, data.drwtNo6,
-      ].sort((a: number, b: number) => a - b),
-      bonusNo: data.bnusNo,
-    };
-  } catch {
-    return null;
+  const target = `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`;
+  for (const buildUrl of CORS_PROXIES) {
+    try {
+      const res = await fetch(buildUrl(target));
+      if (!res.ok) continue;
+      const text = await res.text();
+      let data: any;
+      try { data = JSON.parse(text); } catch { continue; }
+      if (!isValidDrawPayload(data, drwNo)) continue;
+      return {
+        drwNo: data.drwNo,
+        drwNoDate: data.drwNoDate,
+        nums: [
+          data.drwtNo1, data.drwtNo2, data.drwtNo3,
+          data.drwtNo4, data.drwtNo5, data.drwtNo6,
+        ].sort((a: number, b: number) => a - b),
+        bonusNo: data.bnusNo,
+      };
+    } catch {
+      continue;
+    }
   }
+  console.warn(`[lotto] Failed to fetch draw ${drwNo} from all CORS proxies`);
+  return null;
 }
 
 async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<DrawData[]> {
