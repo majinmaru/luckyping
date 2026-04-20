@@ -4,6 +4,7 @@ import BallGame from './BallGame';
 import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
 import DatePickerField from './DatePickerField';
+import AdBanner from '@/components/AdBanner';
 
 type Mode = 'manual' | 'game';
 
@@ -119,6 +120,11 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
       ) : (
         <BallGame onComplete={() => {}} addTicket={addTicket} />
       )}
+
+      {/* AdSense - 번호 입력 */}
+      <div className="mt-4">
+        <AdBanner adSlot="2075933375" format="auto" />
+      </div>
     </div>
   );
 }
