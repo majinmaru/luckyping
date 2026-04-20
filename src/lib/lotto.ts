@@ -213,7 +213,7 @@ export async function fetchLottoData(forceUpdate = false) {
   const expected = getExpectedLatestDrawKST();
 
   if (!forceUpdate && stats.latestDrwNo >= expected && draws.length > 0) {
-    return { stats, draws };
+    return { stats, draws, syncFailed: false };
   }
 
   // Step 2: If we have cached data, do a delta load
