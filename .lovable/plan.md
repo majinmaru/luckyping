@@ -1,59 +1,54 @@
 
-## 최신회차 자동 동기화 — GitHub Actions 방식
 
-### 목표
-매주 토요일 KST 21:00에 GitHub Actions가 dhlottery에서 최신 회차를 fetch → Edge Function `lotto-sync`에 POST → DB upsert.
-GitHub runner는 Azure IP라 dhlottery 차단 사례가 거의 없어 안정적.
+# `LOTTO_SYNC_TOKEN`에 입력할 값 안내
 
-### 아키텍처
+## 결론
+**아무 값이나 길고 무작위한 문자열이면 됩니다.** 어디서 발급받는 토큰이 아니라, **사용자가 직접 만드는 비밀번호** 같은 값입니다.
+
+## 이 토큰의 역할
 
 ```text
-GitHub Actions (cron: 매주 토 UTC 12:00)
-  └─ Node 스크립트
-       ├─ DB 최신 drwNo 조회 (Supabase REST, anon)
-       ├─ expected까지 dhlottery API 직접 fetch
-       ├─ 응답 검증
-       └─ POST → lotto-sync (Bearer LOTTO_SYNC_TOKEN)
-             └─ Edge Function: 토큰 검증 → lotto_draws upsert
+GitHub Actions ──[ x-sync-token: <값> ]──▶ Edge Function (lotto-sync)
+                                              │
+                                              └─ 헤더의 토큰이 LOTTO_SYNC_TOKEN과
+                                                 일치하는지 확인 → 일치해야 DB upsert 허용
 ```
 
-### 변경 사항
+즉, "GitHub Actions만 이 함수를 호출할 수 있게" 막기 위한 **사전 공유 비밀(shared secret)** 입니다. 외부 서비스에서 받아오는 토큰이 아닙니다.
 
-**1. 시크릿 (Lovable Cloud)**
-- `LOTTO_SYNC_TOKEN` — Edge Function ↔ GitHub Action 공유 비밀
+## 어떻게 만들면 되나
 
-**2. GitHub 시크릿 (사용자 직접 설정)**
-- `LOTTO_SYNC_TOKEN` — 위와 동일 값
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY` — DB 최신 회차 조회용 (공개키 OK)
+아래 중 아무 방법이나 사용:
 
-**3. `supabase/functions/lotto-sync/index.ts` 수정**
-- POST 인증 방식 변경: JWT → `x-sync-token` 헤더로 `LOTTO_SYNC_TOKEN` 검증
-- 기존 검증/upsert 로직 유지
+**방법 1 — 터미널 (Mac/Linux):**
+```bash
+openssl rand -hex 32
+```
+출력 예시: `a3f1c9d8e7b6450f2c8d9e1a4b7c6f8d2e3a5c7b9d1f4e6a8c2b5d7e9f1a3c4d`
 
-**4. `supabase/config.toml`**
-- `[functions.lotto-sync] verify_jwt = false` 추가
+**방법 2 — 온라인 생성기:**
+- https://www.random.org/strings/ 에서 길이 64, 문자/숫자 선택
+- 또는 1Password / Bitwarden 같은 패스워드 매니저의 "강력한 암호 생성"
 
-**5. `.github/workflows/lotto-sync.yml` 신규**
-- cron: `0 12 * * 6` (UTC 토 12:00 = KST 21:00)
-- 수동 트리거(workflow_dispatch)도 허용
-- Node 18, fetch 사용
-- 실패 시 자동 재시도 1회
+**방법 3 — 직접 타이핑:**
+- 최소 32자 이상, 영문 대소문자 + 숫자 섞어서
+- 예: `LuckyPing-Sync-2026-xY9zK3mN7pQ2vR8tW1jH5fG6dB4sA0cE` (이런 식, 단 이 예시는 그대로 쓰지 말 것)
 
-**6. `.github/scripts/sync-lotto.mjs` 신규**
-- DB 최신 회차 조회
-- expected 계산 (KST 토 20:50 기준)
-- 누락 회차 dhlottery에서 fetch + 검증
-- lotto-sync로 일괄 POST
+## 입력해야 하는 위치 (총 2곳, 같은 값)
 
-**7. 클라이언트 (`src/lib/lotto.ts`)**
-- 기존 Worker 폴백 로직 유지 (사용자 답변대로)
-- 단, JWT 헤더 대신 sync 토큰을 클라이언트에서 사용할 수는 없으므로
-  → 클라이언트 폴백은 lotto-sync 호출 부분 제거하고 로컬 캐시만 갱신
-  → DB 영구 저장은 cron만 담당
+| 위치 | 용도 |
+|---|---|
+| Lovable Cloud 시크릿 `LOTTO_SYNC_TOKEN` | Edge Function이 검증할 정답 |
+| GitHub Repository Secrets `LOTTO_SYNC_TOKEN` | Action이 헤더에 실어 보낼 값 |
 
-### 진행 순서
-1. `LOTTO_SYNC_TOKEN` 시크릿 추가 (Lovable Cloud)
-2. Edge Function 토큰 인증으로 변경 + config.toml
-3. 워크플로/스크립트 파일 생성
-4. 클라이언트 폴백 정리
-5. 사용자에게 GitHub Secrets 3개 등록 + 수동 1회 실행 안내
+**두 값은 반드시 동일해야** 합니다. 한 번 만들어서 양쪽에 똑같이 붙여넣으면 끝.
+
+## 주의사항
+
+- 한 번 정한 값은 **어디에도 평문으로 저장하지 말 것** (메신저, 메모장, 코드 안 등)
+- 생성한 값을 바로 두 시크릿에 등록 → 로컬 메모는 삭제
+- 유출 의심 시: 새 값 생성 → 양쪽 시크릿 둘 다 갱신 (하나만 바꾸면 동기화 깨짐)
+
+## 진행
+값을 만드신 다음 알려주시면, Lovable Cloud 시크릿 등록 요청을 진행합니다. (GitHub Repository Secrets 쪽은 Lovable이 접근 불가하므로 사용자가 직접 등록)
+
