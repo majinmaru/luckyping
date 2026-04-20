@@ -170,6 +170,9 @@ export interface SyncResult {
 }
 
 async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<SyncResult> {
+  // NOTE: DB persistence is handled by GitHub Actions weekly cron (lotto-sync function).
+  // The client-side fetch here only refreshes the local cache for the current user
+  // when the DB is briefly behind expected (e.g., right after a draw, before cron runs).
   const missing: DrawData[] = [];
   let failed = false;
   for (let i = latestInDb + 1; i <= expected; i++) {
@@ -180,21 +183,6 @@ async function syncMissingDrawsViaClient(latestInDb: number, expected: number): 
       failed = true;
     }
   }
-  if (missing.length === 0) return { draws: [], failed };
-
-  // Send to Edge Function for DB persistence
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.functions.invoke('lotto-sync', {
-        method: 'POST',
-        body: { draws: missing },
-      });
-    }
-  } catch (err) {
-    console.warn('Failed to sync draws to DB:', err);
-  }
-
   return { draws: missing, failed };
 }
 
