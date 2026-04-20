@@ -4,6 +4,7 @@ import BallGame from './BallGame';
 import type { Ticket } from '@/hooks/use-tickets';
 import { toast } from 'sonner';
 import DatePickerField from './DatePickerField';
+import AdBanner from '@/components/AdBanner';
 
 type Mode = 'manual' | 'game';
 
