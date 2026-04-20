@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sync-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface DrawInput {
@@ -31,20 +31,21 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const expectedToken = Deno.env.get('LOTTO_SYNC_TOKEN')
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    // POST: GitHub Actions sends draw data with shared-secret token
+    // POST: client sends draw data to upsert
     if (req.method === 'POST') {
-      if (!expectedToken) {
-        console.error('LOTTO_SYNC_TOKEN is not configured')
-        return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // Verify JWT - must be authenticated
+      const authHeader = req.headers.get('authorization')
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
-      const provided = req.headers.get('x-sync-token')
-      if (!provided || provided !== expectedToken) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid token' }), {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
@@ -92,7 +93,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // GET: report latest drwNo currently in DB (public, used by sync script)
+    // GET: legacy server-side fetch (may fail due to API blocking)
     const { data: latestRow } = await supabase
       .from('lotto_draws')
       .select('drw_no')
@@ -107,7 +108,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('Sync error:', err)
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

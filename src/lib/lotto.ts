@@ -119,36 +119,17 @@ function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
   return Array.from(map.values()).sort((a, b) => a.drwNo - b.drwNo);
 }
 
-// ─── Client-side API fetch via Cloudflare Worker proxy ───
-
-// dhlottery API blocks Supabase Edge Function IPs and most public CORS proxies.
-// We route through a dedicated Cloudflare Worker the project owns.
-const LOTTO_PROXY_URL = 'https://frosty-bird-cbe0.gotch11.workers.dev';
-
-function isValidDrawPayload(data: any, drwNo: number): boolean {
-  if (!data || data.returnValue !== 'success') return false;
-  if (data.drwNo !== drwNo) return false;
-  const nums = [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6];
-  if (!nums.every((n) => typeof n === 'number' && n >= 1 && n <= 45)) return false;
-  if (typeof data.bnusNo !== 'number' || data.bnusNo < 1 || data.bnusNo > 45) return false;
-  if (typeof data.drwNoDate !== 'string') return false;
-  return true;
-}
+// ─── Client-side API fetch (bypasses server blocking) ───
 
 async function fetchDrawFromAPI(drwNo: number): Promise<DrawData | null> {
   try {
-    const res = await fetch(`${LOTTO_PROXY_URL}/?drwNo=${drwNo}`);
-    if (!res.ok) {
-      console.warn(`[lotto] Worker proxy returned ${res.status} for draw ${drwNo}`);
-      return null;
-    }
+    const res = await fetch(
+      `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`
+    );
     const text = await res.text();
     let data: any;
-    try { data = JSON.parse(text); } catch {
-      console.warn(`[lotto] Non-JSON response for draw ${drwNo}`);
-      return null;
-    }
-    if (!isValidDrawPayload(data, drwNo)) return null;
+    try { data = JSON.parse(text); } catch { return null; }
+    if (data.returnValue !== 'success') return null;
     return {
       drwNo: data.drwNo,
       drwNoDate: data.drwNoDate,
@@ -158,32 +139,33 @@ async function fetchDrawFromAPI(drwNo: number): Promise<DrawData | null> {
       ].sort((a: number, b: number) => a - b),
       bonusNo: data.bnusNo,
     };
-  } catch (err) {
-    console.warn(`[lotto] Worker proxy fetch error for draw ${drwNo}:`, err);
+  } catch {
     return null;
   }
 }
 
-export interface SyncResult {
-  draws: DrawData[];
-  failed: boolean;
-}
-
-async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<SyncResult> {
-  // NOTE: DB persistence is handled by GitHub Actions weekly cron (lotto-sync function).
-  // The client-side fetch here only refreshes the local cache for the current user
-  // when the DB is briefly behind expected (e.g., right after a draw, before cron runs).
+async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<DrawData[]> {
   const missing: DrawData[] = [];
-  let failed = false;
   for (let i = latestInDb + 1; i <= expected; i++) {
     const draw = await fetchDrawFromAPI(i);
-    if (draw) {
-      missing.push(draw);
-    } else {
-      failed = true;
-    }
+    if (draw) missing.push(draw);
   }
-  return { draws: missing, failed };
+  if (missing.length === 0) return [];
+
+  // Send to Edge Function for DB persistence
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.functions.invoke('lotto-sync', {
+        method: 'POST',
+        body: { draws: missing },
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to sync draws to DB:', err);
+  }
+
+  return missing;
 }
 
 /**
@@ -201,7 +183,7 @@ export async function fetchLottoData(forceUpdate = false) {
   const expected = getExpectedLatestDrawKST();
 
   if (!forceUpdate && stats.latestDrwNo >= expected && draws.length > 0) {
-    return { stats, draws, syncFailed: false };
+    return { stats, draws };
   }
 
   // Step 2: If we have cached data, do a delta load
@@ -225,19 +207,17 @@ export async function fetchLottoData(forceUpdate = false) {
   }
 
   // Step 4: If DB is behind, fetch from client and sync
-  let syncFailed = false;
   if (stats.latestDrwNo < expected) {
-    const result = await syncMissingDrawsViaClient(stats.latestDrwNo, expected);
-    syncFailed = result.failed;
-    if (result.draws.length > 0) {
-      draws = mergeDraws(draws, result.draws);
+    const clientDraws = await syncMissingDrawsViaClient(stats.latestDrwNo, expected);
+    if (clientDraws.length > 0) {
+      draws = mergeDraws(draws, clientDraws);
       stats = buildStats(draws);
       saveHistoryCache(draws);
       saveStatsCache(stats);
     }
   }
 
-  return { stats, draws, syncFailed };
+  return { stats, draws };
 }
 
 export function getExpectedLatestDrawKST(): number {

@@ -39,24 +39,20 @@ export default function ProbTab({ tickets }: ProbTabProps) {
     setStatusState('loading');
     setStatusText(force ? '최신 데이터 업데이트 중...' : '데이터 로드 중...');
     try {
-      const { stats: newStats, draws, syncFailed } = await fetchLottoData(force);
+      const { stats: newStats, draws } = await fetchLottoData(force);
       setStats(newStats);
       setHistory(draws);
       saveStatsCache(newStats);
       saveHistoryCache(draws);
-      const expected = getExpectedLatestDrawKST();
-      if (newStats.latestDrwNo >= expected) {
-        setStatusState('ok');
-        setStatusText(getUpdateStatusText(newStats.latestDrwNo));
-        if (force) toast('✅ 최신 데이터로 업데이트 완료');
-      } else if (syncFailed) {
-        setStatusState('warn');
-        setStatusText(`외부 데이터 소스 호출 실패 · 기존 데이터 사용 중 (${newStats.latestDrwNo}회차)`);
-        if (force) toast('⚠️ 외부 데이터 소스에서 최신 회차를 가져오지 못했어요');
-      } else {
-        setStatusState('warn');
-        setStatusText(`최신 회차 미발표 · ${newStats.latestDrwNo}회차까지 반영`);
-        if (force) toast('⏳ 아직 최신 회차가 발표되지 않았어요');
+      setStatusState('ok');
+      setStatusText(getUpdateStatusText(newStats.latestDrwNo));
+      if (force) {
+        const expected = getExpectedLatestDrawKST();
+        if (newStats.latestDrwNo >= expected) {
+          toast('✅ 최신 데이터로 업데이트 완료');
+        } else {
+          toast('⚠️ 일부 업데이트 완료 (최신 회차 데이터가 아직 제공되지 않을 수 있어요)');
+        }
       }
     } catch (err: any) {
       if (stats.freq && stats.totalDraws > 0) {
