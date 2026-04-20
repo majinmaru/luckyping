@@ -120,6 +120,11 @@ export default function AddTab({ tickets, addTicket }: AddTabProps) {
       ) : (
         <BallGame onComplete={() => {}} addTicket={addTicket} />
       )}
+
+      {/* AdSense - 번호 입력 */}
+      <div className="mt-4">
+        <AdBanner adSlot="2075933375" format="auto" />
+      </div>
     </div>
   );
 }
