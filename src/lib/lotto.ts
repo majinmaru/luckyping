@@ -119,15 +119,11 @@ function mergeDraws(existing: DrawData[], newDraws: DrawData[]): DrawData[] {
   return Array.from(map.values()).sort((a, b) => a.drwNo - b.drwNo);
 }
 
-// ─── Client-side API fetch (bypasses server blocking) ───
+// ─── Client-side API fetch via Cloudflare Worker proxy ───
 
-// CORS proxies (fallback chain). dhlottery API blocks browser direct calls,
-// so we route through public CORS proxies to obtain JSON.
-const CORS_PROXIES = [
-  (target: string) => `https://corsproxy.io/?${encodeURIComponent(target)}`,
-  (target: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-  (target: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`,
-];
+// dhlottery API blocks Supabase Edge Function IPs and most public CORS proxies.
+// We route through a dedicated Cloudflare Worker the project owns.
+const LOTTO_PROXY_URL = 'https://frosty-bird-cbe0.gotch11.workers.dev';
 
 function isValidDrawPayload(data: any, drwNo: number): boolean {
   if (!data || data.returnValue !== 'success') return false;
@@ -140,39 +136,51 @@ function isValidDrawPayload(data: any, drwNo: number): boolean {
 }
 
 async function fetchDrawFromAPI(drwNo: number): Promise<DrawData | null> {
-  const target = `https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${drwNo}`;
-  for (const buildUrl of CORS_PROXIES) {
-    try {
-      const res = await fetch(buildUrl(target));
-      if (!res.ok) continue;
-      const text = await res.text();
-      let data: any;
-      try { data = JSON.parse(text); } catch { continue; }
-      if (!isValidDrawPayload(data, drwNo)) continue;
-      return {
-        drwNo: data.drwNo,
-        drwNoDate: data.drwNoDate,
-        nums: [
-          data.drwtNo1, data.drwtNo2, data.drwtNo3,
-          data.drwtNo4, data.drwtNo5, data.drwtNo6,
-        ].sort((a: number, b: number) => a - b),
-        bonusNo: data.bnusNo,
-      };
-    } catch {
-      continue;
+  try {
+    const res = await fetch(`${LOTTO_PROXY_URL}/?drwNo=${drwNo}`);
+    if (!res.ok) {
+      console.warn(`[lotto] Worker proxy returned ${res.status} for draw ${drwNo}`);
+      return null;
     }
+    const text = await res.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch {
+      console.warn(`[lotto] Non-JSON response for draw ${drwNo}`);
+      return null;
+    }
+    if (!isValidDrawPayload(data, drwNo)) return null;
+    return {
+      drwNo: data.drwNo,
+      drwNoDate: data.drwNoDate,
+      nums: [
+        data.drwtNo1, data.drwtNo2, data.drwtNo3,
+        data.drwtNo4, data.drwtNo5, data.drwtNo6,
+      ].sort((a: number, b: number) => a - b),
+      bonusNo: data.bnusNo,
+    };
+  } catch (err) {
+    console.warn(`[lotto] Worker proxy fetch error for draw ${drwNo}:`, err);
+    return null;
   }
-  console.warn(`[lotto] Failed to fetch draw ${drwNo} from all CORS proxies`);
-  return null;
 }
 
-async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<DrawData[]> {
+export interface SyncResult {
+  draws: DrawData[];
+  failed: boolean;
+}
+
+async function syncMissingDrawsViaClient(latestInDb: number, expected: number): Promise<SyncResult> {
   const missing: DrawData[] = [];
+  let failed = false;
   for (let i = latestInDb + 1; i <= expected; i++) {
     const draw = await fetchDrawFromAPI(i);
-    if (draw) missing.push(draw);
+    if (draw) {
+      missing.push(draw);
+    } else {
+      failed = true;
+    }
   }
-  if (missing.length === 0) return [];
+  if (missing.length === 0) return { draws: [], failed };
 
   // Send to Edge Function for DB persistence
   try {
@@ -187,7 +195,7 @@ async function syncMissingDrawsViaClient(latestInDb: number, expected: number): 
     console.warn('Failed to sync draws to DB:', err);
   }
 
-  return missing;
+  return { draws: missing, failed };
 }
 
 /**
