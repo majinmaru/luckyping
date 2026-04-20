@@ -1,0 +1,41 @@
+name: Lotto Weekly Sync
+
+on:
+  schedule:
+    # 매주 토요일 KST 21:00 = UTC 12:00
+    - cron: '0 12 * * 6'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run sync (attempt 1)
+        id: sync1
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          LOTTO_SYNC_TOKEN: ${{ secrets.LOTTO_SYNC_TOKEN }}
+        run: node .github/scripts/sync-lotto.mjs
+
+      - name: Wait before retry
+        if: steps.sync1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Run sync (attempt 2 / retry)
+        if: steps.sync1.outcome == 'failure'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          LOTTO_SYNC_TOKEN: ${{ secrets.LOTTO_SYNC_TOKEN }}
+        run: node .github/scripts/sync-lotto.mjs
