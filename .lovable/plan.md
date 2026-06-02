@@ -1,56 +1,49 @@
-## 목표
-기존 Supabase에서 export한 사용자 2명(76a0601a..., 38fcea6c...)과 티켓 60건을 새 Supabase(ugdsgueyidscjfluymhg)에 **기존 UUID를 그대로 유지하면서** 마이그레이션.
+## 문제 진단
 
-## 전제: 이메일 정보 필요
-Admin API로 같은 UUID 사용자를 만들려면 **이메일이 반드시 필요**합니다. 현재 "unknown"으로 답변하셨는데, 두 가지 방법 중 하나로 진행 가능:
+`https://majinmaru.github.io/luckyping/`의 HTML을 확인해보니 `<script src="/src/main.tsx">`가 들어 있습니다. 이는 **빌드되지 않은 원본 `index.html`**이 서빙되고 있다는 증거입니다. 정상 빌드라면 `/luckyping/assets/index-XXXX.js` 같은 해시된 번들이 들어가야 합니다.
 
-**옵션 A (권장):** 본인이 기억하는 이메일 1개(아마 `gotch0411@gmail.com`)는 본인 UUID에 매핑, 나머지 1명은 플레이스홀더 이메일(`legacy-user-1@luckyping.local`)로 생성. 그 사용자는 사실상 로그인 불가 상태로 데이터만 보존.
+원인은 두 가지 중 하나(또는 둘 다)입니다:
 
-**옵션 B:** 두 명 모두 플레이스홀더 이메일로 생성. 나중에 본인 계정은 Supabase Dashboard에서 이메일 변경 → 비밀번호 재설정.
+1. **GitHub Pages 소스 설정이 "GitHub Actions"가 아니라 "Deploy from a branch (main / root)"로 되어 있음** → Actions 워크플로가 만든 `dist/`가 무시되고 저장소 루트가 그대로 서빙됨
+2. **`VITE_BASE_PATH` Secret이 `/`로 되어 있거나 비어 있음** → 빌드가 되더라도 자산 경로가 `/assets/...`로 나와 `/luckyping/...`에서 404
 
-→ Plan 실행 시작 전 어떤 UUID가 본인 계정인지 알려주시면 옵션 A로 진행.
+## 해결 계획 (사용자가 GitHub에서 직접 해야 하는 작업)
 
-## 단계
+### 1단계: GitHub Pages 배포 소스 변경
+- 저장소 → **Settings → Pages**
+- **Source** 드롭다운을 **"GitHub Actions"**로 변경 (현재 "Deploy from a branch"로 되어 있을 것)
 
-### 1. Admin 스크립트 작성 (`scripts/migrate-users.mjs`)
-- `@supabase/supabase-js`의 `auth.admin.createUser()` 사용
-- `SUPABASE_SERVICE_ROLE_KEY`로 인증
-- 각 UUID에 대해 `{ id, email, email_confirm: true, password: <임시랜덤> }` 로 생성
-- 이미 존재하면 skip
+### 2단계: Repository Secret 확인/수정
+**Settings → Secrets and variables → Actions** 에서 다음 값 확인:
 
-### 2. 새 Supabase 환경 변수 준비 (로컬 `.env.migrate`)
-```
-SUPABASE_URL=https://ugdsgueyidscjfluymhg.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<새 프로젝트 service role key>
-```
-service role key는 Supabase Dashboard → Project Settings → API에서 복사.
+| Secret 이름 | 값 |
+|---|---|
+| `VITE_SUPABASE_URL` | `https://ugdsgueyidscjfluymhg.supabase.co` (새 프로젝트) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | 새 Supabase 프로젝트의 anon key |
+| `VITE_BASE_PATH` | `/luckyping/` ← **슬래시 양쪽 포함** |
+| `VITE_LAMBDA_API_BASE` | (Lambda 안 쓰면 비워둬도 됨) |
 
-### 3. 사용자 생성 실행
-```
-node scripts/migrate-users.mjs
-```
-→ auth.users에 2개 row 생성 확인.
+### 3단계: 워크플로 재실행
+- **Actions** 탭 → "Deploy to GitHub Pages" → **Run workflow** (또는 아무 커밋 푸시)
+- 빌드 완료 후 `https://majinmaru.github.io/luckyping/` 새로고침 (캐시 무시: Ctrl+Shift+R)
 
-### 4. 티켓 데이터 import용 SQL 생성 (`scripts/tickets_insert.sql`)
-- `tickets.csv` → `INSERT INTO public.tickets (id, user_id, nums, purchases, wins, created_at, updated_at) VALUES (...)` 형태로 변환하는 1회용 Node 스크립트로 생성
-- `ON CONFLICT (id) DO NOTHING` 추가하여 재실행 안전
-- 결과 파일은 `/mnt/documents/luckyping-export/tickets_insert.sql`에도 출력
+### 4단계: 새 Supabase에서 Auth Redirect URL 등록
+새 Supabase 프로젝트 대시보드 → **Authentication → URL Configuration**:
+- **Site URL**: `https://majinmaru.github.io/luckyping/`
+- **Redirect URLs** 에 추가:
+  - `https://majinmaru.github.io/luckyping/`
+  - `https://majinmaru.github.io/luckyping/auth`
+  - `https://majinmaru.github.io/luckyping/reset-password`
 
-### 5. 새 Supabase SQL Editor에서 실행
-1. `migration_schema.sql` (이미 실행했으면 skip)
-2. `lotto_draws_insert.sql` (이미 실행했으면 skip)
-3. `tickets_insert.sql` ← 이번에 새로 생성
+이게 빠지면 로그인은 되더라도 콜백에서 흰 화면/오류가 납니다.
 
-### 6. 검증
-- SQL Editor에서 `select count(*) from public.tickets;` → 60
-- 새 프로젝트에 본인 이메일로 로그인 시도 → 비밀번호 재설정 메일 받고 새 비밀번호 설정 → 기존 티켓들이 모두 보이는지 확인
+## 검증 방법
 
-## 결과물
-- `scripts/migrate-users.mjs` (사용자 재생성 스크립트)
-- `scripts/tickets_insert.sql` (티켓 import SQL)
-- `MIGRATION.md`에 위 절차 추가
+배포 후 `view-source:https://majinmaru.github.io/luckyping/`에서 `<script>` 태그가 `/luckyping/assets/index-XXXXXX.js`처럼 해시된 경로를 가리키면 정상입니다.
 
-## 사용자가 직접 해야 하는 것
-1. 어떤 UUID가 본인인지 + 이메일 알려주기 (또는 옵션 B 선택)
-2. 새 Supabase의 **service role key** 알려주기 (스크립트 실행용)
-3. 마이그레이션 후 본인 이메일로 비밀번호 재설정
+## 추가로 확인할 점
+
+- **GitHub Actions 로그 확인**: 가장 최근 워크플로 실행이 성공했는지(녹색 체크)? 실패했다면 어느 단계에서 멈췄는지 알려주시면 추가 진단 가능합니다.
+- 이 프로젝트(Lovable 쪽) 코드는 **수정할 부분이 없습니다**. 모든 작업은 GitHub 저장소 설정에서 이뤄집니다.
+
+진행하시고 막히면 Actions 로그 스크린샷이나 에러 메시지 공유해주세요.
