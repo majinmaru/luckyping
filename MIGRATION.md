@@ -37,9 +37,36 @@ Authentication → URL Configuration
 - Site URL: `https://<github-username>.github.io/<repo>/` (또는 커스텀 도메인)
 - Redirect URLs에 동일 URL + `https://<...>/reset-password` 추가
 
-### 1-5. tickets 데이터 이전 (선택)
-회원이 새로 가입한 뒤, 새 user_id로 매핑해서 import해야 합니다.
-사용자가 2명뿐이므로 본인이 재가입 후 수동 매핑하는 게 가장 빠릅니다.
+### 1-5. tickets 데이터 이전 (기존 UUID 유지 방식)
+
+1. **새 Supabase에서 service role key 복사**: Dashboard → Project Settings → API → `service_role` key
+2. **로컬에 환경 파일 생성** (gitignore됨):
+   ```bash
+   cat > scripts/.env.migrate <<EOF
+   SUPABASE_URL=https://ugdsgueyidscjfluymhg.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=<위에서 복사한 service role key>
+   EOF
+   ```
+3. **(선택) 이메일 매핑 수정**: `scripts/migrate-users.mjs` 상단의 `USERS` 배열에서 본인 UUID의 email을 실제 이메일로 변경. 모르면 그대로 두면 `legacy-user-N@luckyping.local` placeholder로 생성됨.
+4. **레거시 사용자 재생성** (auth.users에 같은 UUID로 row 2개 생성):
+   ```bash
+   node scripts/migrate-users.mjs
+   ```
+5. **티켓 INSERT SQL 실행**: `/mnt/documents/luckyping-export/tickets_insert.sql` (또는 repo의 `scripts/tickets_insert.sql`) 내용을 새 Supabase SQL Editor에 붙여넣고 Run. 60건이 들어갑니다.
+6. **검증**:
+   ```sql
+   select count(*) from public.tickets;   -- 60
+   select count(*) from auth.users;       -- 2 이상
+   ```
+7. **본인 계정 비밀번호 설정**: 앱에서 본인 이메일로 "비밀번호 재설정" 메일 받아 새 비밀번호 설정 → 로그인 → 기존 티켓 확인.
+
+> placeholder 이메일로 만든 다른 레거시 계정은 사실상 로그인 불가 상태입니다 (데이터 보존 목적). 필요 없으면 해당 user_id의 tickets/auth.users row를 삭제해도 됩니다.
+
+### tickets.csv를 다시 생성하고 싶다면
+```bash
+node scripts/generate-tickets-sql.mjs <path/to/tickets.csv> <output.sql>
+```
+
 
 ---
 

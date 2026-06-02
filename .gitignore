@@ -27,3 +27,5 @@ dist-ssr
 .env.local
 .aws-sam/
 lambda/**/node_modules/
+
+scripts/.env.migrate

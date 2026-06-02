@@ -1,85 +1,56 @@
-# LuckyPing 외부 운영 이전 계획
+## 목표
+기존 Supabase에서 export한 사용자 2명(76a0601a..., 38fcea6c...)과 티켓 60건을 새 Supabase(ugdsgueyidscjfluymhg)에 **기존 UUID를 그대로 유지하면서** 마이그레이션.
 
-목표: Lovable 호스팅을 떠나 **GitHub Pages(프론트) + AWS Lambda(백엔드 로직) + 본인 Supabase `dlybhuneuwukkvyfrmmh`(DB/Auth)** 조합으로 자체 운영.
+## 전제: 이메일 정보 필요
+Admin API로 같은 UUID 사용자를 만들려면 **이메일이 반드시 필요**합니다. 현재 "unknown"으로 답변하셨는데, 두 가지 방법 중 하나로 진행 가능:
 
----
+**옵션 A (권장):** 본인이 기억하는 이메일 1개(아마 `gotch0411@gmail.com`)는 본인 UUID에 매핑, 나머지 1명은 플레이스홀더 이메일(`legacy-user-1@luckyping.local`)로 생성. 그 사용자는 사실상 로그인 불가 상태로 데이터만 보존.
 
-## 1단계: 본인 Supabase에 스키마/데이터 구축
+**옵션 B:** 두 명 모두 플레이스홀더 이메일로 생성. 나중에 본인 계정은 Supabase Dashboard에서 이메일 변경 → 비밀번호 재설정.
 
-기존 Lovable Cloud(`wtpplbyvhhmuqklyynce`)에 있는 모든 자산을 새 프로젝트로 이전.
+→ Plan 실행 시작 전 어떤 UUID가 본인 계정인지 알려주시면 옵션 A로 진행.
 
-**스키마 마이그레이션** (본인 Supabase SQL Editor에서 실행할 SQL을 `migration.sql` 파일로 제공)
-- `lotto_draws` 테이블 (drw_no, drw_no_date, nums, bonus_no) + RLS(Anyone read)
-- `tickets` 테이블 (user_id, nums, purchases jsonb, wins jsonb) + 사용자별 RLS 4종
-- `update_updated_at_column()` 함수 + tickets용 트리거
-- `protect_ticket_sensitive_columns()` 트리거 (wins/purchases 클라이언트 변경 차단)
-- 모든 테이블에 anon/authenticated/service_role GRANT
+## 단계
 
-**데이터 이관 방법**
-- `lotto_draws`: Lambda 동기화 함수가 채워주므로 비워둬도 됨 (또는 CSV export → import)
-- `tickets`: Lovable Cloud에 접근 가능한 동안 본인이 CSV/JSON export 받아 새 프로젝트에 import. 자체 export 스크립트(`scripts/export-from-old.ts`) 제공
-- `auth.users`: Supabase는 프로젝트 간 직접 이전이 불가능. 사용자에게 비밀번호 재설정 메일 발송 안내 필요 (소셜 로그인 사용자는 재로그인만 하면 됨, 단 user_id가 달라지므로 tickets 매칭 처리 필요)
+### 1. Admin 스크립트 작성 (`scripts/migrate-users.mjs`)
+- `@supabase/supabase-js`의 `auth.admin.createUser()` 사용
+- `SUPABASE_SERVICE_ROLE_KEY`로 인증
+- 각 UUID에 대해 `{ id, email, email_confirm: true, password: <임시랜덤> }` 로 생성
+- 이미 존재하면 skip
 
-**Auth 설정**
-- 본인 Supabase 대시보드에서 Email/Password, Google, Apple 활성화
-- Site URL: `https://<github-username>.github.io/<repo>/` 추가
-- Google/Apple OAuth 콜백 URL 재등록
-
-## 2단계: 프론트엔드 Lovable 의존성 제거
-
-- `package.json`에서 `lovable-tagger`, `@lovable.dev/cloud-auth-js`, Capacitor 관련 제거
-- `vite.config.ts`에서 `componentTagger` 플러그인 제거, `base: '/<repo>/'` 추가 (GitHub Pages 서브패스 대응)
-- `src/integrations/supabase/client.ts`를 환경변수(`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) 기반으로 재작성
-- `.env.example` 제공, `.env`는 gitignore
-- `supabase.functions.invoke('ticket-update', ...)` 호출부 → Lambda 엔드포인트 fetch 호출로 변경 (`src/lib/api.ts` 신설)
-- Lovable Cloud 전용 코드/주석 정리
-
-## 3단계: AWS Lambda 백엔드
-
-기존 Edge Function 2종을 Lambda로 이식 (`lambda/` 디렉터리에 소스 포함, 별도 GitHub repo 또는 SAM/Serverless로 배포).
-
-- **`ticket-update`**: 현재 `supabase/functions/ticket-update/index.ts` 로직 Node.js 변환. JWT 검증 후 `service_role` 키로 tickets의 wins/purchases 갱신
-- **`lotto-sync`**: 동행복권 데이터를 주기적으로 가져와 `lotto_draws` upsert (EventBridge 스케줄 트리거)
-- 공통: API Gateway(HTTP API) + CORS 설정, 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LOTTO_SYNC_TOKEN`
-
-배포 가이드(`lambda/README.md`)에 AWS CLI/SAM 명령어 포함.
-
-## 4단계: GitHub Pages 배포
-
-- `.github/workflows/deploy.yml` 작성: push to main → `npm ci && npm run build` → `dist/` GitHub Pages에 배포
-- GitHub repo Secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_LAMBDA_API_BASE`
-- `public/404.html` SPA fallback 추가 (React Router 라우트 대응)
-- 커스텀 도메인 쓰면 `CNAME` 추가
-
-## 5단계: 운영/문서
-
-- `README.md`: 로컬 개발, 환경변수, 배포 절차
-- `MIGRATION.md`: 기존 사용자 안내 (재로그인/비밀번호 재설정 안내문 템플릿)
-- AdSense 게시자 ID 등 기존 설정 유지 확인
-
----
-
-## 기술 세부사항
-
-```text
-[Browser]
-   │  GitHub Pages 정적 파일 (Vite build)
-   ▼
-[ React App ]
-   ├─► supabase-js → dlybhuneuwukkvyfrmmh.supabase.co  (Auth, SELECT tickets/lotto_draws)
-   └─► fetch → AWS API Gateway → Lambda(ticket-update)
-                                  └─ service_role → Supabase (UPDATE tickets)
-                                  
-[EventBridge cron] ─► Lambda(lotto-sync) ─► Supabase (UPSERT lotto_draws)
+### 2. 새 Supabase 환경 변수 준비 (로컬 `.env.migrate`)
 ```
+SUPABASE_URL=https://ugdsgueyidscjfluymhg.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<새 프로젝트 service role key>
+```
+service role key는 Supabase Dashboard → Project Settings → API에서 복사.
 
-**중요 주의사항**
-1. 본 작업 완료 후 Lovable 프리뷰는 동작하지 않게 됨 (Lovable Cloud 끊김). 작업 중에는 로컬 `npm run dev`로 테스트
-2. `src/integrations/supabase/client.ts`는 평소 Lovable이 자동 관리하지만, 외부 운영 전환 시 수동 관리로 전환됨
-3. `auth.users`는 이전 불가 → 기존 회원은 신규 가입 필요. tickets의 `user_id`를 이메일 기반으로 매핑하는 일회성 스크립트 제공
-4. Lovable Cloud의 `wtpplbyvhhmuqklyynce`에서 데이터를 export하려면 지금 가능한 동안(Lovable에서 접근 가능할 때) 미리 받아둬야 함 — **이 export를 이번 작업 시작 전에 먼저 수행 권장**
+### 3. 사용자 생성 실행
+```
+node scripts/migrate-users.mjs
+```
+→ auth.users에 2개 row 생성 확인.
 
-## 결정 필요 사항
-- AWS Lambda 배포 도구: **SAM** vs **Serverless Framework** vs **수동 zip 업로드** 중 선호?
-- GitHub repo는 이미 존재? (Lovable이 자동 연결한 repo 사용 / 신규 생성)
-- 기존 회원 데이터 export 권한 확보 가능 여부 확인됨?
+### 4. 티켓 데이터 import용 SQL 생성 (`scripts/tickets_insert.sql`)
+- `tickets.csv` → `INSERT INTO public.tickets (id, user_id, nums, purchases, wins, created_at, updated_at) VALUES (...)` 형태로 변환하는 1회용 Node 스크립트로 생성
+- `ON CONFLICT (id) DO NOTHING` 추가하여 재실행 안전
+- 결과 파일은 `/mnt/documents/luckyping-export/tickets_insert.sql`에도 출력
+
+### 5. 새 Supabase SQL Editor에서 실행
+1. `migration_schema.sql` (이미 실행했으면 skip)
+2. `lotto_draws_insert.sql` (이미 실행했으면 skip)
+3. `tickets_insert.sql` ← 이번에 새로 생성
+
+### 6. 검증
+- SQL Editor에서 `select count(*) from public.tickets;` → 60
+- 새 프로젝트에 본인 이메일로 로그인 시도 → 비밀번호 재설정 메일 받고 새 비밀번호 설정 → 기존 티켓들이 모두 보이는지 확인
+
+## 결과물
+- `scripts/migrate-users.mjs` (사용자 재생성 스크립트)
+- `scripts/tickets_insert.sql` (티켓 import SQL)
+- `MIGRATION.md`에 위 절차 추가
+
+## 사용자가 직접 해야 하는 것
+1. 어떤 UUID가 본인인지 + 이메일 알려주기 (또는 옵션 B 선택)
+2. 새 Supabase의 **service role key** 알려주기 (스크립트 실행용)
+3. 마이그레이션 후 본인 이메일로 비밀번호 재설정
