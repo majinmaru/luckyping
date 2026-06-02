@@ -1,1 +1,0 @@
-DROP POLICY "Authenticated users can insert draws" ON public.lotto_draws;
