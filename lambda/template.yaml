@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: LuckyPing backend (ticket-update + lotto-sync)
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 15
+    MemorySize: 256
+    Architectures: [arm64]
+    Environment:
+      Variables:
+        SUPABASE_URL: !Ref SupabaseUrl
+        SUPABASE_SERVICE_ROLE_KEY: !Ref SupabaseServiceRoleKey
+        SUPABASE_ANON_KEY: !Ref SupabaseAnonKey
+
+Parameters:
+  SupabaseUrl:
+    Type: String
+    Description: e.g. https://dlybhuneuwukkvyfrmmh.supabase.co
+  SupabaseServiceRoleKey:
+    Type: String
+    NoEcho: true
+  SupabaseAnonKey:
+    Type: String
+    NoEcho: true
+  CorsOrigin:
+    Type: String
+    Default: "*"
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: [!Ref CorsOrigin]
+        AllowHeaders: ["content-type", "authorization"]
+        AllowMethods: ["POST", "OPTIONS"]
+
+  TicketUpdateFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ticket-update/
+      Handler: index.handler
+      Events:
+        ApiPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /ticket-update
+            Method: POST
+
+  LottoSyncFn:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lotto-sync/
+      Handler: index.handler
+      Timeout: 60
+      Events:
+        WeeklySchedule:
+          # Every Saturday 22:00 KST (= 13:00 UTC)
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 13 ? * SAT *)
+
+Outputs:
+  ApiBaseUrl:
+    Description: Use this as VITE_LAMBDA_API_BASE
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
