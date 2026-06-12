@@ -17,7 +17,7 @@ Globals:
 Parameters:
   SupabaseUrl:
     Type: String
-    Description: e.g. https://dlybhuneuwukkvyfrmmh.supabase.co
+    Description: e.g. https://ugdsgueyidscjfluymhg.supabase.co
   SupabaseServiceRoleKey:
     Type: String
     NoEcho: true

@@ -1,4 +1,4 @@
-// Supabase client — points to user-owned Supabase project.
+// Supabase client — reads connection info from Vite env vars at build time.
 // Configure via env: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';

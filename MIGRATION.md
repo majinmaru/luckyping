@@ -1,13 +1,13 @@
 # LuckyPing 외부 운영 마이그레이션 가이드
 
-기존: Lovable Cloud (`wtpplbyvhhmuqklyynce`) + Lovable hosting
-신규: **GitHub Pages** (프론트) + **AWS Lambda** (API) + **본인 Supabase `dlybhuneuwukkvyfrmmh`** (DB/Auth)
+기존: 구 Supabase 프로젝트 + 외부 호스팅
+신규: **GitHub Pages** (프론트) + **AWS Lambda** (API) + **본인 Supabase `ugdsgueyidscjfluymhg`** (DB/Auth)
 
 ---
 
 ## 0. export된 기존 데이터
 
-`/mnt/documents/luckyping-export/` 에 백업해뒀습니다.
+`/mnt/documents/luckyping-export/` 에 백업되어 있습니다.
 
 - `lotto_draws.csv` / `lotto_draws.jsonl` — 1218 회차
 - `lotto_draws_insert.sql` — 새 Supabase SQL Editor에 바로 붙여넣기 가능
@@ -18,7 +18,7 @@
 
 ---
 
-## 1. 본인 Supabase 세팅
+## 1. 본인 Supabase 세팅 (`ugdsgueyidscjfluymhg`)
 
 ### 1-1. 스키마 생성
 `migration.sql` 전체를 새 Supabase 프로젝트의 **SQL Editor**에서 실행하세요.
@@ -48,7 +48,7 @@ Authentication → URL Configuration
    EOF
    ```
 3. **(선택) 이메일 매핑 수정**: `scripts/migrate-users.mjs` 상단의 `USERS` 배열에서 본인 UUID의 email을 실제 이메일로 변경. 모르면 그대로 두면 `legacy-user-N@luckyping.local` placeholder로 생성됨.
-4. **레거시 사용자 재생성** (auth.users에 같은 UUID로 row 2개 생성):
+4. **레거시 사용자 재생성**:
    ```bash
    node scripts/migrate-users.mjs
    ```
@@ -60,13 +60,10 @@ Authentication → URL Configuration
    ```
 7. **본인 계정 비밀번호 설정**: 앱에서 본인 이메일로 "비밀번호 재설정" 메일 받아 새 비밀번호 설정 → 로그인 → 기존 티켓 확인.
 
-> placeholder 이메일로 만든 다른 레거시 계정은 사실상 로그인 불가 상태입니다 (데이터 보존 목적). 필요 없으면 해당 user_id의 tickets/auth.users row를 삭제해도 됩니다.
-
 ### tickets.csv를 다시 생성하고 싶다면
 ```bash
 node scripts/generate-tickets-sql.mjs <path/to/tickets.csv> <output.sql>
 ```
-
 
 ---
 
@@ -79,7 +76,7 @@ cd lambda
 sam build
 sam deploy --guided \
   --parameter-overrides \
-    SupabaseUrl=https://dlybhuneuwukkvyfrmmh.supabase.co \
+    SupabaseUrl=https://ugdsgueyidscjfluymhg.supabase.co \
     SupabaseServiceRoleKey=<service-role-key> \
     SupabaseAnonKey=<anon-key> \
     CorsOrigin=https://<github-username>.github.io
@@ -96,7 +93,7 @@ Repo → Settings → Secrets and variables → Actions → New repository secre
 
 | Name | 값 |
 |---|---|
-| `VITE_SUPABASE_URL` | `https://dlybhuneuwukkvyfrmmh.supabase.co` |
+| `VITE_SUPABASE_URL` | `https://ugdsgueyidscjfluymhg.supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | 본인 Supabase anon key |
 | `VITE_LAMBDA_API_BASE` | SAM 배포 후 받은 ApiBaseUrl |
 | `VITE_BASE_PATH` | repo 이름 형태: `/luckyping/` (커스텀 도메인이면 `/`) |
@@ -120,14 +117,6 @@ bun run dev
 
 ---
 
-## 5. Lovable 정리
-
-- 이 시점부터 **Lovable 프리뷰는 동작하지 않습니다** (Lovable Cloud 연결 끊김).
-- Lovable 에디터에서 더 이상 수정하지 않을 거면 프로젝트를 보관 처리하세요.
-- GitHub repo는 그대로 사용하면 됩니다 (Lovable이 자동 동기화하지 않음).
-
----
-
-## 6. 기존 사용자 안내 템플릿
+## 5. 기존 사용자 안내 템플릿
 
 > LuckyPing이 새 서버로 이전되었습니다. 기존 회원분들께서는 죄송하지만 **재가입**이 필요합니다 (보안상 비밀번호 이전이 불가능합니다). 이전에 저장하신 티켓 기록이 필요하신 경우 gotch0411@gmail.com 으로 문의 주세요.

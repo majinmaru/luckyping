@@ -35,7 +35,7 @@ sam build
 # 2) 최초 배포 (대화형으로 스택 이름 등 입력)
 sam deploy --guided \
   --parameter-overrides \
-    SupabaseUrl=https://dlybhuneuwukkvyfrmmh.supabase.co \
+    SupabaseUrl=https://ugdsgueyidscjfluymhg.supabase.co \
     SupabaseServiceRoleKey=eyJhbGc... \
     SupabaseAnonKey=eyJhbGc... \
     CorsOrigin=https://<github-username>.github.io
