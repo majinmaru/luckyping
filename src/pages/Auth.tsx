@@ -36,7 +36,7 @@ export default function Auth() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: redirectBase },
         });
         if (error) throw error;
         toast.success('확인 이메일을 보냈습니다. 이메일을 확인해주세요!');
