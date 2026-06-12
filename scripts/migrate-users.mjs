@@ -2,7 +2,7 @@
 //
 // Usage:
 //   1. Create scripts/.env.migrate (gitignored) with:
-//        SUPABASE_URL=https://ugdsgueyidscjfluymhg.supabase.co
+//        SUPABASE_URL=https://ugdsgueyidscjfluymhg.supabase.co  # 본인 Supabase 프로젝트
 //        SUPABASE_SERVICE_ROLE_KEY=<service role key from new project>
 //   2. Optionally edit USERS array below to set known emails.
 //   3. Run:  node scripts/migrate-users.mjs
