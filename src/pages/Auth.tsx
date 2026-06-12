@@ -61,7 +61,7 @@ export default function Auth() {
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: redirectBase },
     });
     if (error) {
       toast.error(error.message || '소셜 로그인 중 오류가 발생했습니다');
