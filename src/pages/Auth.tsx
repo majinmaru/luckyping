@@ -7,6 +7,8 @@ import PasswordChecklist from '@/components/auth/PasswordChecklist';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
+const redirectBase = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/$/, '');
+
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -34,7 +36,7 @@ export default function Auth() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: redirectBase },
         });
         if (error) throw error;
         toast.success('확인 이메일을 보냈습니다. 이메일을 확인해주세요!');
@@ -44,7 +46,7 @@ export default function Auth() {
         navigate('/');
       } else if (mode === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${redirectBase}/reset-password`,
         });
         if (error) throw error;
         toast.success('비밀번호 재설정 이메일을 보냈습니다');
@@ -59,7 +61,7 @@ export default function Auth() {
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: redirectBase },
     });
     if (error) {
       toast.error(error.message || '소셜 로그인 중 오류가 발생했습니다');
