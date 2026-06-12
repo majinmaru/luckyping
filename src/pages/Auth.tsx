@@ -46,7 +46,7 @@ export default function Auth() {
         navigate('/');
       } else if (mode === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${redirectBase}/reset-password`,
         });
         if (error) throw error;
         toast.success('비밀번호 재설정 이메일을 보냈습니다');
