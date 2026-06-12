@@ -7,6 +7,8 @@ import PasswordChecklist from '@/components/auth/PasswordChecklist';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
+const redirectBase = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/$/, '');
+
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
