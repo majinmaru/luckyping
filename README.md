@@ -46,3 +46,26 @@ bun run dev
 ## 문의
 
 gotch0411@gmail.com
+
+## 프로젝트 구조
+
+```
+.
+├── .github/workflows/deploy.yml   # GitHub Pages 자동 배포
+├── index.html                     # 엔트리 HTML (AdSense 스크립트 포함)
+├── migration.sql                  # Supabase 스키마 (테이블/RLS)
+├── MIGRATION.md                   # 배포·이전 가이드
+├── lambda/                        # AWS SAM (ticket-update, lotto-sync)
+├── scripts/                       # 데이터 이전용 일회성 스크립트
+├── public/                        # favicon, robots.txt
+└── src/
+    ├── pages/                     # Index, Auth, ResetPassword, Terms, Privacy, NotFound
+    ├── components/
+    │   ├── lotto/                 # 티켓 기록/생성/분석 UI
+    │   ├── auth/                  # PasswordChecklist
+    │   └── ui/                    # 실사용 shadcn 컴포넌트 7종만 유지
+    ├── contexts/AuthContext.tsx
+    ├── hooks/                     # use-tickets, use-toast
+    ├── integrations/supabase/     # supabase 클라이언트/타입
+    └── lib/                       # api, lotto 로직, utils
+```
